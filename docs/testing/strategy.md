@@ -36,6 +36,29 @@ npx playwright test <spec-file> --project=webkit
 
 Infrastructure validation executes in the separate `family-paas` repository. That owner MUST report its exact format, validation, policy-test, and Terraform-plan commands in the handoff evidence; Todone does not invent or prescribe that repository's internal command paths. No verification command may apply, deploy, invalidate production, create production users, restore, or smoke-test production without explicit human authorization.
 
+## Offline development
+
+Todone supports an entirely local authentication workflow through the development-only `cognito-local` emulator. It is not an AWS account, does not require internet access after dependencies are installed, and its pool/client/user database is ignored in `.cognito/db/`.
+
+Bootstrap it once from the repository root:
+
+```sh
+npm run dev:cognito
+npm run setup:local-cognito
+```
+
+The setup script creates or reuses a local username-based user pool and public app client, creates a local-only verification account, and writes non-secret local endpoint/pool/client values to ignored `.env.local`. The default account is `localdev` with password `LocalDevPass123!`; this is a disposable local-only credential and MUST NOT be used for a real Cognito pool.
+
+Then start the app and local API in a separate terminal:
+
+```sh
+npm run dev:full
+```
+
+Open `http://localhost:3000`, enter the local verification account, and confirm the temporary form reaches its signed-in state. `cognito-local` supports `USER_PASSWORD_AUTH`, not SRP, so `AuthClient` uses that flow only when `VITE_COGNITO_LOCAL_ENDPOINT` is explicitly present. The ordinary deployed configuration continues to use Cognito SRP. Local JWT verification fetches the local emulator JWKS and caches it; production verification continues to validate the real Cognito issuer, audience, token use, and JWKS.
+
+To reset local identities, stop the emulator, delete `.cognito/db/`, delete `.env.local`, and repeat the bootstrap steps. This deletes synthetic local data only.
+
 ## Test layers
 
 ### Static checks

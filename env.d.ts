@@ -7,6 +7,12 @@ interface ImportMetaEnv {
   readonly VITE_COGNITO_CLIENT_ID: string;
   /** AWS region hosting the Cognito user pool. */
   readonly VITE_COGNITO_REGION: string;
+  /**
+   * LOCAL DEVELOPMENT ONLY. Set by scripts/setup-local-cognito.ts to point
+   * the auth client at cognito-local instead of real Cognito. Never set
+   * this against a deployed pool.
+   */
+  readonly VITE_COGNITO_LOCAL_ENDPOINT?: string;
 }
 
 interface ImportMeta {

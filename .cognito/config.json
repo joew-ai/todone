@@ -1,0 +1,8 @@
+{
+  "TokenConfig": {
+    "IssuerDomain": "http://localhost:9229"
+  },
+  "UserPoolDefaults": {
+    "UsernameAttributes": []
+  }
+}

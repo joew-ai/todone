@@ -1,10 +1,9 @@
+import type { ApiResult } from './apiResult';
+
 export interface HealthResponse {
   status: 'ok';
   timestamp: string;
 }
-
-export type ApiResult<T> =
-  { kind: 'success'; data: T } | { kind: 'error'; message: string; recoverable: boolean };
 
 /**
  * Typed boundary between the Vue shell and the local API simulator (and,

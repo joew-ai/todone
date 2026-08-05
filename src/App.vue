@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { fetchHealth, type ApiResult, type HealthResponse } from './services/apiClient';
+import { fetchHealth, type HealthResponse } from './services/apiClient';
+import type { ApiResult } from './services/apiResult';
+import TemporarySignIn from './components/TemporarySignIn.vue';
 
 const result = ref<ApiResult<HealthResponse> | null>(null);
 const loading = ref(true);
@@ -54,5 +56,7 @@ onMounted(load);
         </div>
       </div>
     </section>
+
+    <TemporarySignIn class="mt-6" />
   </main>
 </template>

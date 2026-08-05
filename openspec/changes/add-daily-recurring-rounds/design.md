@@ -1,40 +1,50 @@
 ## Context
 
-Daily recurrence is explicitly post-MVP. It extends stable Todo lifecycle/history behavior with immutable dated occurrences so a missed day remains useful history without intruding on today's work.
+Daily recurrence is explicitly post-MVP. A recurrence template schedules ordinary dated Todo records. Generated Todos use the established lifecycle and product deletion behavior, with recurrence-only `MISSED` and `SKIPPED` outcomes so prior rounds remain useful history without intruding on today's work.
 
 ## Goals / Non-Goals
 
-**Goals:** daily templates, household-local dated occurrences, idempotent rollover, and non-actionable historical rounds.
+**Goals:** daily templates, household-local generated Todos, idempotent rollover, server-side current-round recovery, and non-actionable historical rounds.
 
-**Non-Goals:** weekly/monthly recurrence, arbitrary schedules, ordered routine checklists, push notifications, rewards, and retroactive child completion.
+**Non-Goals:** weekly/monthly recurrence, arbitrary schedules, elapsed-round backfill, ordered routine checklists, push notifications, rewards, skip reversal, and retroactive child completion.
 
 ## Decisions
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CurrentActive
-    CurrentActive --> CurrentComplete: complete
-    CurrentActive --> HistoricalSkipped: parent skips
-    CurrentActive --> HistoricalMissed: local day ends
-    CurrentComplete --> HistoricalComplete: local day ends
-    HistoricalMissed --> [*]
-    HistoricalSkipped --> [*]
-    HistoricalComplete --> [*]
+    [*] --> ActiveGeneratedTodo
+    ActiveGeneratedTodo --> Complete: assignee or parent completes
+    ActiveGeneratedTodo --> Skipped: parent skips
+    ActiveGeneratedTodo --> Missed: local day ends incomplete
+    Complete --> DetachedActiveTodo: any eligible undo or reopen
+    ActiveGeneratedTodo --> DetachedActiveTodo: parent edits due date
+    Missed --> Complete: parent correction
+    DetachedActiveTodo --> Complete: complete
+    DetachedActiveTodo --> Skipped: parent archives
+    Skipped --> [*]
+    Complete --> [*]
 ```
 
-- A recurrence template owns immutable date-keyed Todo occurrences. Occurrence ID uniqueness derives from template ID and household-local date.
-- Generate current-day occurrences via scheduled invocation with a lazy read-time reconciliation fallback. Both use conditional writes.
+- Keep RecurrenceTemplate separate from Todo. A template supplies future generation values; each round creates an ordinary Todo with template ID and household-local date round key metadata.
+- Derive uniqueness from template ID plus local date. A template created during a day becomes effective at the next local day boundary.
+- Run generation server-side on a schedule independent of user reads. A server-side reconciliation path creates only the current round when needed; it does not backfill elapsed dates.
 - Use Household timezone stored at bootstrap, never browser-local timezone, for date boundary calculations.
-- Current occurrences reuse active Todo presentation; history is read-only for children.
-- Parent skip transitions only current active occurrences and retains reason/state metadata.
+- Template create/edit/remove affects future generation only. Remove retires the template while retaining identity required by existing Todo history.
+- Generated Todos use ordinary validation, edit, completion, label, and product-deletion behavior where their current lifecycle permits. `MISSED` and `SKIPPED` are recurrence-only historical outcomes; their metadata is immutable.
+- Ordinary Archive on a rollover-bound active generated Todo means `SKIPPED`, records no reason, and is irreversible. Archive on an already detached active Todo also resolves it as skipped. Parent missed correction replaces `MISSED` with `COMPLETED`, recording the parent and correction time.
+- Editing a generated Todo's due date or reopening/undoing any completed generated round sets a rollover-detached flag. The Todo preserves template/round provenance but behaves as ordinary active work in the default list and is not auto-missed.
+- Children see only their current generated Todos in active views and their own prior outcomes in history.
+- Member history remains chronological and gives `MISSED` an explicit text label plus restrained red warning. No trends dashboard, aggregation, date filters, special sorting, or chart is introduced.
+- Reuse existing privacy-safe logs and free CloudWatch metrics. Do not provision paid alerting or monitoring resources for recurrence.
+- Extend the child-removal cascade with RecurrenceTemplate, generated Todo, recurrence-history, and associated audit-snapshot deletion before identity deletion and username release complete.
 
 ## Risks / Trade-offs
 
-- Scheduled execution may fail or run late; lazy reconciliation and health alerts mitigate missing current work.
+- Scheduled execution may fail or run late; current-round reconciliation repairs present work, while accepted elapsed gaps remain absent from history.
 - Daylight-saving transitions require date arithmetic in the household IANA timezone rather than fixed 24-hour intervals.
 
 ## Migration Plan
 
-- Introduce templates and occurrence keys without changing one-off Todo records.
+- Introduce templates and generated-Todo metadata without changing one-off Todo behavior.
 - Release daily creation and query behavior before enabling the schedule.
-- Roll back schedule safely; existing occurrences remain normal historical records.
+- Roll back the schedule safely; existing generated Todos remain ordinary current or historical Todo records.

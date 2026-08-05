@@ -5,8 +5,10 @@ The initial completion loop needs controlled correction and durable history. Par
 ## What Changes
 
 - Add parent editing, archive, restore, and deletion for Todos.
-- Add completed and archived history for parents and read-only own-history for children.
-- Preserve historical identity and resolve concurrent lifecycle actions safely.
+- Add the first parent-visible completed/archived history and own-history for children, including child undo of their own completion and parent reopen through the same state transition.
+- Preserve the state held immediately before archival so restore returns active work to active and completed work to completed; overdue remains derived from date.
+- Keep completed and archived Todo metadata immutable, resolve concurrent edits and lifecycle actions safely, and retain live profile identity while a member exists.
+- Remove explicitly deleted Todos from all product views and history while retaining a full internal audit snapshot. Full child-account removal separately purges the child's associated records and audit snapshots.
 
 ## Capabilities
 
@@ -15,10 +17,10 @@ The initial completion loop needs controlled correction and durable history. Par
 
 ### Modified Capabilities
 
-- `family-todo-completion`: Extends Todo state and visibility after completion.
+- None. The lifecycle and history behavior is fully specified by the new capability without changing the prerequisite completion contract.
 
 ## Impact
 
 - Depends on the first family Todo loop.
 - Adds `ARCHIVED` and deletion behavior but keeps recurrence outcomes out of scope.
-- Explicit parent deletion is irreversible; archive is the normal reversible removal mechanism.
+- Explicit parent deletion is irreversible in the product UI; archive is the normal reversible removal mechanism. Deleted data remains accessible only as a restricted internal audit snapshot until an account-removal policy requires its purge.

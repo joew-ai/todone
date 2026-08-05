@@ -4,9 +4,9 @@ The first useful vertical slice follows established households and profiles. It 
 
 ## Goals / Non-Goals
 
-**Goals:** create, view, complete, undo, and reopen one-off single-assignee Todos.
+**Goals:** create, view, and complete one-off single-assignee Todos with durable completion metadata.
 
-**Non-Goals:** edits after creation, archival/history, labels, recurrence, unassigned Todos, and multiple assignees.
+**Non-Goals:** completion reversal, edits after creation, archival/history, labels, recurrence, unassigned Todos, and multiple assignees.
 
 ## Decisions
 
@@ -22,18 +22,19 @@ sequenceDiagram
     API->>D: Query assignee active items
     C->>API: Complete Todo
     API->>D: Conditional state transition
-    API-->>C: Confirm and offer undo
-    P->>API: View child's active list
-    API-->>P: Completion actor and timestamp
+    API-->>C: Confirm and remove from active list
 ```
 
-- Todo fields include immutable ID, household ID, title, optional due date, assignee snapshot, status, creation metadata, completion metadata, and version.
-- Model `ACTIVE` and `COMPLETE`; overdue is a date-derived presentation state, not a stored terminal status.
-- Use a household/assignee active-item index for child queries and household membership authorization before access.
+- Todo fields include immutable ID, household ID, title, optional date-only due value, scalar assignee member ID, status, creation metadata, completion metadata, and version.
+- Model `ACTIVE` and `COMPLETE`; derive overdue after household-local end-of-day from Household timezone and due date rather than storing a terminal state.
+- Resolve current member display name and color from the profile when rendering. Do not write assignee identity snapshots onto Todo records.
+- Use the canonical data-model/access-pattern document for assignee and household active-list queries and authorize membership before access.
 - Conditional writes on status and version make completion idempotent and return the current state for double taps or stale clients.
-- Use server timestamps and retain display-name/color snapshots needed for stable rendering.
+- Use server timestamps for completion actor/time. Reversal uses the same underlying transition as parent reopen, but is deferred until the next change supplies completed/history visibility.
 
 ## Risks / Trade-offs
 
 - Parent completion is allowed deliberately; it records the parent as actor rather than impersonating the child.
 - No optimistic false success: client UI waits for server confirmation, trading a small delay for correct family visibility.
+- Extend the family-account removal cascade for the Todo entity introduced here. Delete all active and completed Todos assigned to the child before profile/identity deletion completes and username reuse is allowed.
+- Completed Todos are not rendered to parents or children in this change. The next lifecycle/history change consumes the persisted actor/time metadata for completion visibility.

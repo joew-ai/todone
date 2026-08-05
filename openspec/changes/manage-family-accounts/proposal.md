@@ -4,10 +4,14 @@ Parents need to create and recover child accounts without email, while children 
 
 ## What Changes
 
-- Add parent-created child and parent accounts using username/password credentials.
-- Add parent-managed child password reset and member display profiles.
+- Add parent-created child and parent accounts using globally unique immutable usernames and separate mutable, non-unique display names.
+- Activate additional parent accounts through a verified email and self-selected password so each parent has their own Cognito Forgot Password path.
+- Add private self-service parent recovery-email settings with verification before a replacement address becomes active.
+- Add parent-managed child passwords and password reset without requiring a child email address.
+- Add self-service display-name and profile-color editing; members cannot edit another member's profile.
 - Add immutable creation-time roles and peer-parent protections.
-- Add child-account removal behavior and recovery from partial account provisioning.
+- Add confirmed full child-account removal with an extensible cascade contract. This change deletes the Cognito identity, Membership/profile, and all currently known child-owned data; each downstream Todo/history/recurrence change extends and tests the cascade for the records it introduces. The username becomes reusable after successful deletion.
+- Document AWS/CLI repair for partial provisioning instead of building recovery UI or monitoring for this edge case.
 
 ## Capabilities
 
@@ -16,7 +20,7 @@ Parents need to create and recover child accounts without email, while children 
 
 ### Modified Capabilities
 
-- `household-membership`: Adds member roles and lifecycle behavior.
+- None. The prerequisite `household-membership` capability already defines immutable roles and active membership; this change adds family-account behavior without changing those requirements.
 
 ## Impact
 

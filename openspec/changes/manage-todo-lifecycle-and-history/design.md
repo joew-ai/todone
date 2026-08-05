@@ -4,9 +4,9 @@ The first Todo slice contains active and complete work only. This change adds co
 
 ## Goals / Non-Goals
 
-**Goals:** parent lifecycle control, durable role-scoped history, and safe concurrent updates.
+**Goals:** parent lifecycle control, child completion correction, durable role-scoped history, and safe concurrent updates.
 
-**Non-Goals:** recurrence states, child editing, labels, bulk operations, and retention expiry.
+**Non-Goals:** recurrence states, child metadata editing, multiple/unassigned ownership, labels, bulk operations, and time-based retention expiry.
 
 ## Decisions
 
@@ -17,25 +17,28 @@ stateDiagram-v2
     Complete --> Active: child undo or parent reopen
     Active --> Archived: parent archives
     Complete --> Archived: parent archives
-    Archived --> Active: parent restores
+    Archived --> Active: restore prior Active
+    Archived --> Complete: restore prior Complete
     Active --> Deleted: parent confirms deletion
     Complete --> Deleted: parent confirms deletion
     Archived --> Deleted: parent confirms deletion
 ```
 
-- Preserve one Todo record and lifecycle audit fields rather than copying history into a separate mutable document.
+- Preserve one Todo record and lifecycle audit fields rather than copying history into a separate mutable document. Store `preArchiveStatus` while archived so restore is state-preserving.
 - Maintain active and historical query projections keyed by assignee and household.
-- Store versioned conditional writes for edit, archive, restore, delete, completion, undo, and reopen.
-- Snapshot assignee display identity at assignment and preserve it after account removal or profile rename.
-- Children receive history queries only for their own assignee ID and read-only response shapes.
+- Store versioned conditional writes for edit, archive, restore, product deletion, completion, undo, and reopen. Undo and reopen share one completed-to-active operation with role-specific authorization.
+- Permit title, date, and assignee edits only while active; overdue remains active and is derived. Completed and archived metadata is immutable, and archived records accept only restore or parent deletion.
+- Resolve assignee and completion actor display identity from current profiles. Full child removal deletes associated work/history, so no removed-member profile fallback is required.
+- Children receive history queries only for their own current assignee ID. They may undo only a completion they performed on a Todo still assigned to them.
+- Product deletion removes all user-visible projections and writes a restricted full audit snapshot containing the deleted Todo and completion metadata. Product APIs never expose this snapshot. Full child-account removal purges audit snapshots associated with that child.
 
 ## Risks / Trade-offs
 
-- Permanent deletion conflicts with “keep history forever”; archive is surfaced as the default, and deletion needs a confirmation dialog.
+- Product deletion conflicts with “keep history forever”; archive is surfaced as the default, deletion needs a confirmation dialog, and a restricted audit snapshot preserves operator accountability without remaining visible to the family.
 - Concurrent edits require explicit refresh messaging rather than last-write-wins data loss.
 
 ## Migration Plan
 
-- Extend existing Todo records with a default `ACTIVE` or `COMPLETE` lifecycle status and version.
+- Extend existing Todo records with a default `ACTIVE` or `COMPLETE` lifecycle status, version, optional `preArchiveStatus`, and audit-snapshot path.
 - Deploy read compatibility first, then lifecycle write routes and UI.
-- Roll back by disabling new routes/UI; no automatic restoration of explicitly deleted records is possible.
+- Roll back by disabling new routes/UI; restoration of a product-deleted record requires an explicit operator process from its restricted audit snapshot and is not a user feature.

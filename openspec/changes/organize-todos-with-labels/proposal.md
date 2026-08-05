@@ -5,8 +5,10 @@ As household work accumulates, parents need a lightweight way to group and narro
 ## What Changes
 
 - Add household-scoped labels and allow one optional label per Todo.
-- Suggest existing labels during Todo editing and allow parents to create a new label through the same flow.
+- Allow parents to add, change, or clear labels on active and completed Todos while keeping archived Todos fully immutable.
+- Suggest existing labels during Todo editing and allow parents to create a new trimmed, maximum-40-character label through the same flow; case-insensitive duplicates are rejected.
 - Add accessible active-list and history filtering by label.
+- Expose household labels as child filter options while featuring labels already used on that child's Todos; filtering never expands Todo visibility.
 
 ## Capabilities
 
@@ -15,7 +17,7 @@ As household work accumulates, parents need a lightweight way to group and narro
 
 ### Modified Capabilities
 
-- `todo-lifecycle-history`: Adds label visibility and filtering to existing Todo views.
+- None. Labels add a new organizational capability without changing the prerequisite lifecycle contract.
 
 ## Impact
 

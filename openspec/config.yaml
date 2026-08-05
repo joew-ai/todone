@@ -1,20 +1,78 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Project stage: Greenfield personal application.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Product source of truth:
+  - docs/product/brief.md
+  - docs/product/mvp-scope.md
+  - docs/product/user-flows.md
+
+  Engineering source of truth:
+  - AGENTS.md
+  - docs/architecture/
+  - docs/security/
+  - docs/testing/
+
+  Development principles:
+  - Prefer simple, reversible architecture.
+  - Build in complete vertical slices.
+  - Do not silently resolve ambiguous product requirements.
+  - Do not introduce dependencies without documenting the reason.
+  - Do not weaken tests to make an implementation pass.
+  - Every user-facing feature must define loading, empty, error,
+    disabled, success, and recovery behavior where applicable.
+  - Accessibility, authorization, observability, and failure handling
+    are part of feature completion, not follow-up work.
+
+  Quality expectations:
+  - Strict static typing where supported.
+  - Automated formatting and linting.
+  - Unit and integration tests for business behavior.
+  - Playwright tests for critical user journeys.
+  - Accessibility checks for user-facing surfaces.
+  - Security-negative tests for authorization and ownership boundaries.
+  - Production build must pass before a task is complete.
+
+rules:
+  proposal:
+    - State the user problem and desired outcome before describing a solution.
+    - Identify the affected users and primary user journeys.
+    - Include explicit scope and non-goals.
+    - Identify assumptions, unresolved decisions, and external dependencies.
+    - Define measurable acceptance or success criteria.
+    - Identify privacy, security, accessibility, and operational implications.
+    - Explain why this change should be one change rather than several smaller changes.
+
+  specs:
+    - Organize specifications by product capability, not by source-code file or UI page.
+    - Use normative language such as SHALL, MUST, and MUST NOT.
+    - Give every requirement a stable descriptive heading.
+    - Include at least one Given/When/Then scenario for every requirement.
+    - Include negative and unauthorized scenarios where relevant.
+    - Cover loading, empty, validation, error, retry, cancellation, and recovery states.
+    - Cover keyboard and screen-reader behavior for interactive UI.
+    - State ownership and tenant-isolation rules explicitly.
+    - Requirements must describe observable behavior rather than implementation details.
+
+  design:
+    - Describe the proposed architecture and component boundaries.
+    - Include data entities, ownership, lifecycle, and deletion behavior.
+    - Describe important APIs, events, contracts, and state transitions.
+    - Include authentication and authorization enforcement points.
+    - Include failure modes, retries, idempotency, and concurrency concerns.
+    - Include logging, metrics, tracing, and supportability.
+    - Include testing strategy by layer.
+    - Include deployment, migration, compatibility, and rollback strategy.
+    - Compare meaningful alternatives and explain why they were rejected.
+    - Use Mermaid sequence or flow diagrams for complex interactions.
+
+  tasks:
+    - Organize work into independently verifiable vertical slices.
+    - Include tests alongside the behavior they verify, not as a final catch-all phase.
+    - Every task must have an observable completion condition.
+    - Include explicit formatter, lint, typecheck, test, build, and Playwright tasks.
+    - Include documentation and telemetry changes where relevant.
+    - Include security-negative and accessibility verification tasks.
+    - Avoid tasks larger than one focused coding session.
+    - Do not use vague tasks such as "finish frontend" or "add remaining tests".

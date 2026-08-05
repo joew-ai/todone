@@ -1,4 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import { recordRequest } from '../shared/observe';
+
+const ROUTE = '/api/v1/health';
 
 /**
  * Local-simulator health handler.
@@ -10,14 +14,18 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
  * infrastructure exists.
  */
 export async function handler(
-  _event: APIGatewayProxyEventV2,
+  event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyStructuredResultV2> {
+  const startedAtMs = performance.now();
+  const requestId = event.requestContext?.requestId ?? randomUUID();
+  const method = event.requestContext?.http?.method ?? 'GET';
+
   const body = {
     status: 'ok' as const,
     timestamp: new Date().toISOString(),
   };
 
-  return {
+  const result: APIGatewayProxyStructuredResultV2 = {
     statusCode: 200,
     headers: {
       'content-type': 'application/json',
@@ -25,4 +33,7 @@ export async function handler(
     },
     body: JSON.stringify(body),
   };
+
+  recordRequest({ route: ROUTE, method, requestId, status: result.statusCode ?? 200, startedAtMs });
+  return result;
 }

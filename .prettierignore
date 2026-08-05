@@ -9,3 +9,7 @@ openspec/
 .opencode/
 .claude/
 package-lock.json
+# cognito-local rewrites this file at every startup (see .gitignore),
+# including its own formatting/trailing-newline choices. It is still
+# committed for review, but format:check must not fail on tool-owned output.
+.cognito/config.json

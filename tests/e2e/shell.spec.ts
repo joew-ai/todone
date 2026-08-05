@@ -19,5 +19,13 @@ test.describe('Application shell', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: 'Todone' })).toBeVisible();
+
+    // Proves the global `prefers-reduced-motion: reduce` rule
+    // (src/assets/main.css) actually applies its near-zero override to
+    // computed styles, not just that the page renders.
+    const transitionDuration = await page.evaluate(
+      () => getComputedStyle(document.body).transitionDuration,
+    );
+    expect(Number.parseFloat(transitionDuration)).toBeCloseTo(0.000001, 6);
   });
 });

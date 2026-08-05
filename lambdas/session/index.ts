@@ -1,5 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { createCognitoVerifier, type TokenVerifier } from './verifier';
+import { recordRequest } from '../shared/observe';
+
+const ROUTE = '/api/v1/session';
 
 let cachedVerifier: TokenVerifier | null = null;
 
@@ -40,10 +44,29 @@ function extractBearerToken(header: string | undefined): string | null {
  * and `expiresAt` for a valid token; rejects everything else with an
  * identical 401 and no session data.
  *
+ * Every call records one privacy-safe structured log line and one EMF
+ * metrics document (request ID, route, method, status, latency, outcome
+ * only -- see docs/security/threat-model.md "Privacy-safe logging
+ * allowlist"). The token, claims, and headers never reach `recordRequest`.
+ *
  * The optional `verifierOverride` parameter exists only for tests; API
  * Gateway always calls this with a single argument.
  */
 export async function handler(
+  event: APIGatewayProxyEventV2,
+  verifierOverride?: TokenVerifier,
+): Promise<APIGatewayProxyStructuredResultV2> {
+  const startedAtMs = performance.now();
+  const requestId = event.requestContext?.requestId ?? randomUUID();
+  const method = event.requestContext?.http?.method ?? 'GET';
+
+  const result = await handle(event, verifierOverride);
+
+  recordRequest({ route: ROUTE, method, requestId, status: result.statusCode ?? 500, startedAtMs });
+  return result;
+}
+
+async function handle(
   event: APIGatewayProxyEventV2,
   verifierOverride?: TokenVerifier,
 ): Promise<APIGatewayProxyStructuredResultV2> {

@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { simulateLambda } from '../../../local-dev/lambdaSimulator';
 import { handler as sessionHandler } from '../../../lambdas/session/index';
 import type { TokenVerifier } from '../../../lambdas/session/verifier';
@@ -74,5 +74,76 @@ describe('GET /api/v1/session (integration, through the simulated API Gateway bo
 
     expect(missing.body).toEqual(invalid.body);
     expect(missing.status).toBe(invalid.status);
+  });
+});
+
+describe('GET /api/v1/session privacy-safe observability', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  function loggedEntries(): Array<Record<string, unknown>> {
+    return logSpy.mock.calls.map((call: unknown[]) => JSON.parse(call[0] as string));
+  }
+
+  it('records request ID, route, and denied outcome for an induced authentication failure, with no sensitive fields', async () => {
+    await request(buildApp(fakeRejectingVerifier))
+      .get('/api/v1/session')
+      .set('Authorization', 'Bearer invalid-or-expired-token');
+
+    const entries = loggedEntries();
+    const requestLog = entries.find((e) => 'outcome' in e);
+
+    expect(requestLog).toMatchObject({
+      route: '/api/v1/session',
+      method: 'GET',
+      status: 401,
+      outcome: 'denied',
+    });
+    expect(typeof requestLog?.requestId).toBe('string');
+    expect((requestLog?.requestId as string).length).toBeGreaterThan(0);
+
+    for (const call of logSpy.mock.calls) {
+      const raw = call[0] as string;
+      expect(raw).not.toMatch(/bearer|invalid-or-expired-token|sub-123|parent1/i);
+    }
+  });
+
+  it('records a success outcome without leaking sub, username, or the token', async () => {
+    await request(buildApp(fakeValidVerifier))
+      .get('/api/v1/session')
+      .set('Authorization', 'Bearer a-valid-token');
+
+    const entries = loggedEntries();
+    const requestLog = entries.find((e) => 'outcome' in e);
+
+    expect(requestLog).toMatchObject({
+      route: '/api/v1/session',
+      method: 'GET',
+      status: 200,
+      outcome: 'success',
+    });
+
+    for (const call of logSpy.mock.calls) {
+      const raw = call[0] as string;
+      expect(raw).not.toMatch(/bearer|a-valid-token|sub-123|parent1/i);
+    }
+  });
+
+  it('emits an EMF metrics document alongside the structured log for every request', async () => {
+    await request(buildApp(fakeRejectingVerifier)).get('/api/v1/session');
+
+    const entries = loggedEntries();
+    const metricsDoc = entries.find((e) => '_aws' in e);
+
+    expect(metricsDoc).toBeDefined();
+    expect(metricsDoc?.Route).toBe('/api/v1/session');
+    expect(metricsDoc?.AuthorizationDenied).toBe(1);
   });
 });

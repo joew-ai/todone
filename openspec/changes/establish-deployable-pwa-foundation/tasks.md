@@ -17,9 +17,9 @@
 
 ## 3. Operational Safety and Verification
 
-- [ ] 3.1 Add privacy-safe structured logging and minimal health metrics; completion: an induced endpoint failure emits request ID, route, and outcome without sensitive fields.
-- [ ] 3.2 Document deploy, rollback, backup, and restore procedures; completion: documentation identifies artifact rollback and PITR restore responsibilities.
+- [x] 3.1 Add privacy-safe structured logging and minimal health metrics; completion: an induced endpoint failure emits request ID, route, and outcome without sensitive fields.
+- [x] 3.2 Document deploy, rollback, backup, and restore procedures; completion: documentation identifies artifact rollback and PITR restore responsibilities.
 - [x] 3.3 Add integration and security-negative tests for protected endpoint access; completion: unauthenticated and malformed-token cases fail without data disclosure.
-- [ ] 3.4 Add Playwright and accessibility coverage for temporary sign-in and shell keyboard behavior at representative iPhone, iPad, and laptop viewports; completion: compact, medium, and wide tests pass and reduced motion is honored.
+- [x] 3.4 Add Playwright and accessibility coverage for temporary sign-in and shell keyboard behavior at representative iPhone, iPad, and laptop viewports; completion: compact, medium, and wide tests pass and reduced motion is honored.
 - [ ] 3.5 Run format, lint, typecheck, unit tests, integration tests, production build, Playwright, accessibility checks, and Terraform plan; completion: all results are recorded without bypassing failures.
 - [ ] 3.6 After explicit human deployment authorization, run and record a production smoke test through the live PWA sign-in form and protected endpoint; completion: the live response matches the current-session contract. If deployment is not authorized, leave this task incomplete rather than claiming the change is done.

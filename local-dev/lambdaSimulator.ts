@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 
 type Handler = (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyStructuredResultV2>;
@@ -17,6 +18,7 @@ export async function simulateLambda(handler: Handler, req: Request, res: Respon
     rawQueryString: '',
     headers: req.headers as Record<string, string>,
     requestContext: {
+      requestId: randomUUID(),
       http: {
         method: req.method,
         path: req.path,

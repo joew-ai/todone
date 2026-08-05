@@ -1,0 +1,133 @@
+# Testing Strategy
+
+## Goals
+
+Testing proves product behavior, household isolation, accessible interaction, recoverable operations, and deployable artifacts. Tests are independent evidence; they do not weaken requirements, bypass authorization, call production by default, or accept visual changes blindly.
+
+## Canonical local commands
+
+The application-foundation implementation MUST add package scripts so these commands are the stable local and CI interface:
+
+```sh
+npm ci
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run test:integration
+npm run build
+npm run test:e2e
+npm run test:a11y
+```
+
+Until that baseline is implemented, the repository contains only the legacy external Playwright sample and `npx playwright test` is the only existing suite command. Documentation completion does not claim the target commands currently pass.
+
+Useful targeted interfaces after the baseline exists:
+
+```sh
+npm run test:unit -- <test-file-or-pattern>
+npm run test:integration -- <test-file-or-pattern>
+npx playwright test <spec-file> --project=chromium
+npx playwright test <spec-file> --project=firefox
+npx playwright test <spec-file> --project=webkit
+```
+
+`test:e2e` runs the configured critical Playwright suite in Chromium, Firefox, and WebKit. `test:a11y` runs automated accessibility checks at representative compact, medium, and wide viewports. CI uses a clean install and the same script names; hidden alternate pass paths are not allowed.
+
+Infrastructure validation executes in the separate `family-paas` repository. That owner MUST report its exact format, validation, policy-test, and Terraform-plan commands in the handoff evidence; Todone does not invent or prescribe that repository's internal command paths. No verification command may apply, deploy, invalidate production, create production users, restore, or smoke-test production without explicit human authorization.
+
+## Test layers
+
+### Static checks
+
+- Formatter check fails on drift and does not rewrite files in CI.
+- Lint covers TypeScript, Vue, test, server, and configuration sources with no ignored errors added merely to pass.
+- Typecheck uses strict application and server configurations and checks generated/typed API boundaries.
+- Production build proves PWA/static and Lambda artifacts compile from a clean install and performs a client-artifact secret scan.
+
+### Unit tests
+
+Unit tests cover pure validation, date/time calculations, state transitions, error mapping, redaction, and repository key/projection construction. They include invalid and boundary values, not only happy paths.
+
+Required areas include case-insensitive usernames/labels, IANA timezone validation, date-only parsing, DST and calendar boundaries, immutable roles, Todo transition tables, version conflicts, recurrence keys, monthly clamping, and log allowlisting.
+
+### Integration tests
+
+Integration tests exercise API handlers through realistic JWT verification and a disposable DynamoDB-compatible data boundary. Test helpers may create principals and seed data, but requests still pass through production authorization middleware. There is no "authorized test mode."
+
+Required suites include:
+
+- Valid, missing, malformed, expired, wrong-issuer, and wrong-audience JWTs.
+- Exact `GET /api/v1/session` response and `no-store` behavior.
+- Membership bootstrap idempotency and one-household-per-user concurrency.
+- Every authorization-matrix allow/deny boundary, including inactive membership and cross-household opaque IDs.
+- Cognito administration adapters with secret-safe failures and pool-scoped calls.
+- Conditional Todo lifecycle races and no false duplicate outcomes.
+- Query projection maintenance and no active/history overlap.
+- Full child-removal cascade for every deployed child-associated entity and restricted audit record.
+- Recurrence generation idempotency, current-only reconciliation, and no elapsed backfill.
+- Error envelopes and structured logs free of forbidden values.
+
+Local dependencies use isolated tables/pools or deterministic fakes that preserve conditional-write, transaction, pagination, and JWT semantics. A mock that always returns success is insufficient security evidence.
+
+### Component tests
+
+Components cover form labels, keyboard behavior, focus movement, live-region announcements, state rendering, retry, conflict, disabled controls, reduced motion, and role-dependent action visibility. Component tests do not substitute for server authorization tests.
+
+### Playwright end-to-end tests
+
+Critical flows run through the browser against a local application and local API/auth test environment. They cover:
+
+- Foundation temporary username sign-in, invalid credentials, network retry, protected session call, and eventual removal by bootstrap.
+- Production registration, email-verification test seam, sign-in, restoration, Forgot Password seam, sign-out, household creation, and onboarding.
+- Parent member creation/reset/removal and self-profile editing.
+- Parent Todo assignment, child completion, parent history, undo/reopen, archive/restore, and delete confirmation/cancellation.
+- Label selection/creation/filtering and recurrence current/history behavior as those capabilities ship.
+- Session expiry, access removal, network failure, stale conflict, and safe retry.
+
+At minimum, critical specs run at 390 x 844, 820 x 1180, and 1440 x 900 CSS pixels. Responsive/a11y suites additionally verify 320 CSS-pixel reflow and 200 percent zoom. Browser projects include Chromium, Firefox, and WebKit. Tests use stable role/name locators instead of CSS implementation details.
+
+### Accessibility verification
+
+Automated checks scan each changed route and interaction state with no confirmed violations accepted. Tool false positives require a recorded manual review and rationale. Manual review covers keyboard-only operation, logical/visible focus, screen-reader labels and announcements, zoom/reflow, contrast, touch targets, reduced motion, destructive dialogs, and focus after dynamic list changes.
+
+The reviewer records browser, viewport, screen reader where used, flow, and result. Automated snapshots and accessibility trees are reviewed for meaningful changes, never bulk-accepted.
+
+### Security-negative testing
+
+Each protected operation has tests for missing authentication, wrong role, another member where relevant, another household, inactive/removed membership, malformed/extra ownership fields, stale versions, and forbidden lifecycle states. Security tests assert both denial and absence of side effects/data disclosure.
+
+Log-capture tests seed recognizable canary secrets and private values, induce failures, and assert those values are absent from logs, metrics, errors, URLs, caches, and built browser assets.
+
+### Recovery and infrastructure tests
+
+The `family-paas` owner proves the reviewed plan, least-privilege IAM, Cognito issuer/audience, dedicated table, on-demand billing, encryption, PITR, and rollback outputs. The Todone operator periodically follows the separate-table PITR restore drill in `docs/operations/backup-restore.md` and records item counts, sample access-pattern queries, authorization invariants, and disposal.
+
+## Test data and isolation
+
+- Automated tests never use production endpoints, credentials, tables, pools, or family data.
+- Fixtures use synthetic household names, users, and Todos and generate unique IDs per test/worker.
+- Tests clean their isolated resources without deleting shared developer or production resources.
+- Time-dependent tests inject/freeze server time and specify Household timezone. They do not depend on the machine timezone or wall clock.
+- Concurrency tests coordinate actual competing writes rather than sequentially simulating them.
+- Secrets use test-only canaries and are not committed.
+
+## Ownership and gates
+
+| Evidence | Owner | Release rule |
+| --- | --- | --- |
+| Format, lint, typecheck, unit, integration, build | Implementing engineer | All pass from a clean install. |
+| Playwright across configured browsers/viewports | Implementing engineer | Critical changed flows pass with no `test.only` or local-only skip. |
+| Automated and manual accessibility | Engineer plus feature reviewer | No blocking violation or inaccessible critical flow. |
+| Authorization/threat-model coverage | Engineer plus security reviewer | Matrix allow/deny cases and log redaction pass. |
+| `family-paas` validation and reviewed plan | Platform owner plus Todone reviewer | No unexplained destructive/IAM/cost change. |
+| Production deploy and smoke | Human release owner | Only after explicit authorization; result and artifact IDs recorded. |
+| PITR restore drill | Operator | Performed after table creation and periodically after material model changes. |
+
+A failing required check blocks release. Flaky tests are failures to diagnose, not candidates for unconditional retries or removal. A requirement change is resolved in product/OpenSpec artifacts, never by weakening the assertion silently.
+
+## Production smoke boundary
+
+The production smoke is small and non-destructive: load the deployed PWA, authenticate the verification account through the live temporary form, call the protected session endpoint, verify exactly `sub`, `username`, and `expiresAt`, sign out, and confirm an unauthenticated call is rejected. It happens only after explicit human deployment authorization and uses no real household/Todo data.
+
+Agents do not run this smoke autonomously. If deployment is not authorized, record local and plan evidence and leave the production task incomplete.

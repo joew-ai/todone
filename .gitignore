@@ -18,3 +18,7 @@ terraform/.terraform/
 *.tfstate
 *.tfstate.*
 
+# Local environment (non-secret config copied from .env.example, but never committed)
+.env.local
+.env.*.local
+

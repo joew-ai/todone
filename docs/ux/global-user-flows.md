@@ -12,7 +12,7 @@
 
 1. An operator creates a verification-only Cognito account through an administrator setup command; there is no self-registration in the foundation.
 2. The signed-out user enters username and password in the temporary accessible form.
-3. The PWA authenticates with Cognito, stores only the temporary session material allowed by the security model, and calls `GET /api/v1/session` with the access token.
+3. The PWA authenticates with Cognito, stores only the temporary session material allowed by the security model, and calls `GET /api/v1/session` with the ID token.
 4. The page renders only `sub`, `username`, and `expiresAt` from the protected response.
 5. Invalid credentials keep the user signed out. Network errors preserve the opportunity to retry without exposing credentials.
 6. `bootstrap-household-membership` replaces this form, account-setup path, and obsolete tests after production registration, sign-in, recovery, restoration, and sign-out pass.
@@ -23,7 +23,7 @@
 flowchart TD
     A[Signed out] --> B{Existing account?}
     B -->|Yes| C[Sign in]
-    B -->|No| D[Enter reusable deployment setup secret]
+    B -->|No| D[Enter reusable registration gate password]
     D --> E[Register unique username and verify parent email]
     E --> C
     C --> F{Session valid?}
@@ -35,7 +35,7 @@ flowchart TD
     J --> K[Onboarding: add members, then Todos]
 ```
 
-- The reusable deployment setup secret permits creation of an unattached first-parent account. It does not join or reveal an existing household.
+- The reusable registration gate password permits creation of an unattached first-parent account. It does not join or reveal an existing household, and Cognito credentials remain the authentication control.
 - The first parent verifies a recovery email before onboarding is complete.
 - An authenticated account without Membership can create exactly one new household. Creation is atomic from the user's perspective and safe to retry.
 - Browser timezone is a prefill only. The parent confirms a valid IANA timezone or selects one when detection is unavailable.

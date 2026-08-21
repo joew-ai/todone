@@ -28,7 +28,7 @@ Provide a Todone-compatible pool with these externally observable properties:
 - Cognito `sub` remains the stable identity and is present in issued tokens.
 - Email and phone are optional pool attributes. A later Todone flow can require and verify email for parent recovery without requiring either attribute for child accounts.
 - Default Cognito password policy and throttling are enabled. No custom adaptive-security or bespoke lockout system is required by this handoff.
-- Self-registration behavior must be compatible with Todone's later server-validated setup-secret registration flow; the platform must not create a public path to join an existing household.
+- Self-registration behavior must support Todone's later Cognito pre-signup registration-gate trigger; the platform must not create a public path to join an existing household.
 - Administrative account creation, permanent child password setting/reset, deletion, and parent email verification can be granted later through narrowly scoped runtime permissions.
 
 ### PWA app client
@@ -102,7 +102,7 @@ The `family-paas` implementation may require these non-secret inputs:
 - Static and Lambda artifact identifiers supplied by the release process.
 - Requested DynamoDB secondary-index contracts when each application capability is implemented.
 
-Secrets, passwords, setup secrets, verification-account credentials, and live token values are not Terraform variables, outputs, logs, or handoff artifacts.
+Raw passwords, registration gate values, verification-account credentials, and live token values are not Terraform variables, outputs, logs, or handoff artifacts. A derived registration-gate SHA-256 hash may be supplied as sensitive Lambda environment configuration, but it is never output or logged.
 
 ## Required outputs
 

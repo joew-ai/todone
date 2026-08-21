@@ -23,6 +23,64 @@ A successful response has exactly these application fields:
 
 No household or profile data is returned by the foundation probe.
 
+## Household bootstrap contracts
+
+First-parent identity creation uses Cognito's public client directly rather than an application credential endpoint:
+
+- `SignUp` receives `username`, `password`, `email`, and the registration gate password as temporary validation data for the pre-signup trigger. The gate password is not a Cognito user attribute and is never copied into application data or logs.
+- `ConfirmSignUp` receives `username` and Cognito's email confirmation code. A successful confirmation activates the account and marks its email verified.
+- `ResendConfirmationCode` supports an unconfirmed account whose original code expired or was lost.
+- `ForgotPassword` receives `username`; `ConfirmForgotPassword` receives `username`, Cognito's recovery code, and the new password. User-facing initiation responses remain generic and do not disclose whether an account exists.
+
+After Cognito authentication, the application resolves bootstrap state through:
+
+```http
+GET /api/v1/memberships/current
+Authorization: Bearer <Cognito-ID-token>
+```
+
+An authenticated account without Membership receives exactly:
+
+```json
+{
+  "membership": null
+}
+```
+
+An active member receives exactly:
+
+```json
+{
+  "membership": {
+    "memberId": "opaque-member-id",
+    "role": "parent",
+    "household": {
+      "householdId": "opaque-household-id",
+      "name": "Wegner Family",
+      "timezone": "America/Chicago"
+    }
+  }
+}
+```
+
+An unattached account creates its one household through:
+
+```http
+POST /api/v1/households
+Authorization: Bearer <Cognito-ID-token>
+Idempotency-Key: <opaque-client-generated-key>
+Content-Type: application/json
+
+{
+  "name": "Wegner Family",
+  "timezone": "America/Chicago"
+}
+```
+
+The name is trimmed, must contain 1–80 Unicode characters, and must not contain control characters. The timezone must be an IANA name recognized by the server runtime. Unknown properties are rejected. Success returns `201 Created` with the same non-null `membership` representation as `GET /api/v1/memberships/current`. Reusing the same idempotency key with the same normalized input returns the original successful representation; reusing it with different input returns `409 Conflict`. An existing member's create attempt returns `409 Conflict`, invalid fields return `422 Unprocessable Content`, and missing or invalid authentication returns `401 Unauthorized`.
+
+Neither bootstrap request accepts a household ID, member ID, role, username, email, or Cognito `sub` from the client. Household and membership identifiers are generated server-side, the caller comes from verified authorizer claims, and the initial role is always `parent`.
+
 ## Authentication and authorization
 
 - Protected requests use `Authorization: Bearer <Cognito ID token>` over HTTPS. Tokens MUST NOT appear in URLs, logs, error text, analytics, or persistent application data.

@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Username Session Lifecycle
-The application SHALL replace and remove the foundation's temporary sign-in probe. It SHALL provide production username/password sign-in, session restoration, sign-out, and a first-parent registration flow. Usernames SHALL be immutable, case-insensitive, and globally unique across the user pool, while display names remain separate mutable application profile data. The flow SHALL display loading, invalid-credential, duplicate-username, invalid-setup-secret, network-failure, retry, and signed-out states without exposing credential values.
+The application SHALL replace and remove the foundation's temporary sign-in probe. It SHALL provide production username/password sign-in, current-tab session restoration, sign-out, and a first-parent registration flow. Usernames SHALL be immutable, case-insensitive, and globally unique across the user pool, while display names remain separate mutable application profile data. Cognito session material SHALL use browser `sessionStorage` only and SHALL NOT use `localStorage`, IndexedDB, service-worker caches, URLs, or application data. The flow SHALL display loading, invalid-credential, duplicate-username, invalid-registration-gate, registration-closed, network-failure, retry, and signed-out states without exposing credential values.
 
 #### Scenario: Failed sign-in
 - **WHEN** credentials are invalid
@@ -15,27 +15,43 @@ The application SHALL replace and remove the foundation's temporary sign-in prob
 - **WHEN** the production session flow is delivered
 - **THEN** the foundation's temporary sign-in form, verification-account setup, and obsolete tests are removed
 
+#### Scenario: Session is restored in the current tab
+- **WHEN** a signed-in user reloads the current tab before the Cognito session expires
+- **THEN** the application restores the session from `sessionStorage` without copying token values into persistent browser storage
+
+#### Scenario: User signs out
+- **WHEN** a signed-in user signs out
+- **THEN** session storage and private rendered state are cleared and the signed-out experience is displayed
+
 ### Requirement: Setup-Gated First-Parent Registration
-The deployment SHALL accept public first-parent registration only when the submitted reusable deployment setup secret is valid. A successful registration SHALL create an authenticated account with no household Membership. The setup secret SHALL NOT join an existing household and SHALL NOT be logged or stored as user data. Every later account for an existing household SHALL be created by a parent from family management rather than public registration.
+The deployment SHALL accept public first-parent registration only when a Cognito pre-signup trigger hashes the submitted reusable registration gate password and validates it against the configured `REGISTRATION_GATE_PASSWORD_HASH` environment value. A successful signup SHALL create an unconfirmed Cognito identity with no household Membership; email confirmation SHALL activate it for authentication. The gate password SHALL NOT join an existing household and SHALL NOT be logged or stored as user data. Every later account for an existing household SHALL be created by a parent from family management rather than public registration. A missing or empty configured hash SHALL close public registration.
 
 #### Scenario: Valid first registration
-- **WHEN** a user submits the valid setup secret with valid account details
+- **WHEN** a user submits the valid registration gate password with valid account details
 - **THEN** an unattached account is created and may create one new household after login
 
 #### Scenario: Another household already exists
-- **WHEN** a different user submits the valid setup secret after other households exist
+- **WHEN** a different user submits the valid registration gate password after other households exist
 - **THEN** another unattached account is created without access to or membership in any existing household
 
 #### Scenario: Public registration cannot join household
 - **WHEN** a public registration request includes an existing household identifier or code
 - **THEN** the request does not create that Membership and discloses no household data
 
-### Requirement: First-Parent Recovery Email
-The first-parent registration flow SHALL require an email address and SHALL complete email verification before household onboarding is considered complete. The parent SHALL be able to use Cognito Forgot Password with that verified email. This requirement SHALL NOT make email mandatory for child accounts.
+#### Scenario: Registration is closed
+- **WHEN** the pre-signup trigger has no configured registration gate value
+- **THEN** every public signup is rejected with a safe registration-closed result and no identity is created
+
+### Requirement: Parent Recovery Email
+The first-parent registration flow SHALL require an email address and SHALL use Cognito-assisted confirmation to verify it before sign-in and household onboarding. Cognito SHALL use `verified_email` for self-service account recovery. Every adult/parent account SHALL have a verified recovery email before activation; the later family-management flow SHALL preserve this invariant for additional parents. This requirement SHALL NOT make email mandatory for child accounts.
 
 #### Scenario: Parent verifies recovery email
 - **WHEN** the first parent completes the email verification challenge
 - **THEN** the account becomes recovery-ready and may continue to household onboarding
+
+#### Scenario: Email confirmation code is invalid or expired
+- **WHEN** the first parent submits an invalid or expired Cognito email confirmation code
+- **THEN** the account remains unconfirmed, the form presents safe correction guidance, and the parent can request a replacement code
 
 #### Scenario: Parent uses Forgot Password
 - **WHEN** the first parent initiates Forgot Password for their username

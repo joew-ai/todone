@@ -27,7 +27,7 @@ Authentication proves a Cognito `sub`. Each application request then resolves ac
 
 | Operation | Anonymous | Unattached | Child | Parent | Additional server rule |
 | --- | --- | --- | --- | --- | --- |
-| Register first-parent account | With valid setup secret | Deny while signed in | Deny | Deny | Creates unattached identity only; cannot accept a join target; requires unique username and verified parent email. |
+| Register first-parent account | With valid registration gate | Deny while signed in | Deny | Deny | Pre-signup trigger validates the gate; creates unattached identity only; cannot accept a join target; requires unique username and verified parent email. |
 | Sign in / initiate parent Forgot Password | Allow | Allow | Allow sign-in only | Allow | Cognito rules; recovery requires that account's verified email; generic responses. |
 | Create household | Deny | Self once | Deny | Deny | No existing user lookup; atomically/idempotently creates Household and initial parent Membership. |
 | Read current household/membership | Deny | Returns no membership only | Own household | Own household | Derive by `sub`; never trust requested household ID. |

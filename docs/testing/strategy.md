@@ -102,7 +102,7 @@ Components cover form labels, keyboard behavior, focus movement, live-region ann
 Critical flows run through the browser against a local application and local API/auth test environment. They cover:
 
 - Foundation temporary username sign-in, invalid credentials, network retry, protected session call, and eventual removal by bootstrap.
-- Production registration, email-verification test seam, sign-in, restoration, Forgot Password seam, sign-out, household creation, and onboarding.
+- Production registration gate including closed registration, Cognito email confirmation/resend, sign-in, current-tab restoration from `sessionStorage`, Forgot Password, sign-out, household creation, and onboarding. Browser tests assert that tokens never enter `localStorage`, IndexedDB, URLs, or service-worker caches.
 - Parent member creation/reset/removal and self-profile editing.
 - Parent Todo assignment, child completion, parent history, undo/reopen, archive/restore, and delete confirmation/cancellation.
 - Label selection/creation/filtering and recurrence current/history behavior as those capabilities ship.

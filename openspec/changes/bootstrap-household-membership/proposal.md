@@ -5,7 +5,7 @@ An authenticated account is not enough to safely enter Todone. The first parent 
 ## What Changes
 
 - Replace and remove the foundation's temporary sign-in probe with the production registration, sign-in, parent Forgot Password, sign-out, and session-restoration flow.
-- Gate public first-parent registration with a reusable deployment setup secret. Each successful registrant starts unattached and may create one new household after first login.
+- Gate public first-parent registration with a reusable deployment registration password checked by a Cognito pre-signup trigger. Each successful registrant starts unattached and may create one new household after first login.
 - Require the first parent to verify a recovery email while keeping email optional for child identities created later.
 - Require an authenticated user without membership to create a household before using the application.
 - Create the first immutable parent membership and persist household name and IANA timezone.
@@ -25,5 +25,5 @@ An authenticated account is not enough to safely enter Todone. The first parent 
 
 - Depends on `establish-deployable-pwa-foundation`.
 - Introduces Household and Membership data owned by the authenticated first parent.
-- The setup secret authorizes creation of an unattached first-parent account but never joins an existing household. Existing-household invitations and public joining, pre-existing account attachment, family account creation, and Todos remain out of scope; later members of a household are created only by a parent in the application.
+- The registration gate authorizes creation of an unattached first-parent account but never joins an existing household. Existing-household invitations and public joining, pre-existing account attachment, family account creation, and Todos remain out of scope; later members of a household are created only by a parent in the application.
 - Success: a new username can create exactly one household and cannot access another household.

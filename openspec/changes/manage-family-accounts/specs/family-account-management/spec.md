@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Parent-Provisioned Members
-Any parent SHALL be able to create a child or parent account in their household using a globally unique, case-insensitive, immutable username, a non-unique display name, a profile color, and an immutable selected role. A child account SHALL use a parent-supplied initial password and SHALL NOT require email. A parent account SHALL require an email address, complete email verification, and let the new parent select their own password before activation.
+Any parent SHALL be able to create a child or parent account in their household using a globally unique, case-insensitive, immutable username, a non-unique display name, a profile color, and an immutable selected role. Usernames SHALL be normalized to lowercase, contain 3-24 characters using only `a-z`, `0-9`, `-`, and `_`, allow any permitted character at the beginning or end, and be stored on Membership as an immutable read copy while Cognito remains the uniqueness authority. A child account SHALL use a parent-supplied initial password and SHALL NOT require email. A parent account SHALL require an email address, prove control of it by completing the emailed one-time setup-code flow, and select their own password before activation.
 
 #### Scenario: Parent creates child
 - **WHEN** a parent submits valid child account details
@@ -9,7 +9,15 @@ Any parent SHALL be able to create a child or parent account in their household 
 
 #### Scenario: Parent creates another parent
 - **WHEN** a parent submits a new parent username, display name, profile color, and email
-- **THEN** the new parent completes email verification, selects their own password, and becomes an equal parent member with Cognito Forgot Password recovery
+- **THEN** a pending parent appears in family management and receives a branded welcome email with a one-time setup code for selecting their own password
+
+#### Scenario: Additional parent activates
+- **WHEN** the pending parent supplies their username, emailed one-time setup code, and a valid self-selected password
+- **THEN** Cognito completes the required first-sign-in challenge, the Membership becomes active, and the verified email supports Forgot Password recovery
+
+#### Scenario: Parent manages a pending parent
+- **WHEN** an active parent views a pending parent in family management
+- **THEN** the active parent can resend the welcome email, change the pending email and resend, or cancel the pending account, but cannot manually activate it
 
 #### Scenario: Provisioned username already exists
 - **WHEN** a parent submits a username that case-insensitively matches any existing user-pool username
@@ -27,11 +35,15 @@ Every parent SHALL have equal authority to manage Todos and child accounts. The 
 - **THEN** the API denies the request and the peer parent remains active
 
 ### Requirement: Child Password Reset
-A parent SHALL be able to set a new permanent password for a child account in their household. The new password SHALL never be persisted or logged by Todone.
+A parent SHALL be able to set a new permanent password for a child account in their household. The new password SHALL never be persisted or logged by Todone. A successful reset SHALL globally sign out the child's Cognito sessions and advance a server-side credential-validity cutoff so previously issued JWTs cannot continue to authorize household APIs.
 
 #### Scenario: Child reset succeeds
 - **WHEN** a parent submits a valid replacement password for a household child
 - **THEN** the child can sign in immediately with the replacement password
+
+#### Scenario: Existing child session follows reset
+- **WHEN** a previously authenticated child calls a household API after their password is reset
+- **THEN** authorization rejects the pre-reset token and requires the child to sign in with the replacement password
 
 ### Requirement: Private Parent Recovery Email
 A parent's recovery email SHALL be visible only to that parent in their own security settings and SHALL NOT appear in family management or another parent's APIs. An authenticated parent SHALL be able to replace only their own recovery email. The existing verified email SHALL remain active until the replacement email completes verification, after which Cognito Forgot Password SHALL use the replacement.
@@ -45,7 +57,11 @@ A parent's recovery email SHALL be visible only to that parent in their own secu
 - **THEN** the peer's recovery email is not returned or displayed
 
 ### Requirement: Profile Identity
-Each member SHALL have a mutable, non-unique display name and a profile color selected from a documented palette whose use meets the application's WCAG contrast rules. A member SHALL edit only their own display name and profile color. Interfaces SHALL pair profile color with the member's visible name and SHALL NOT use color as the only identity signal.
+Each member SHALL have a mutable, non-unique display name and a profile color selected by stable identifier from the canonical nature-inspired palette: `PINE` `#2F6B4F`, `FERN` `#4D7C3F`, `MOSS` `#6B7A3A`, `CLAY` `#B85C3F`, `CEDAR` `#8A5A44`, `MARIGOLD` `#966300`, `LAKE` `#337B8C`, and `DUSK` `#76507A`. A member SHALL edit only their own display name and profile color. Interfaces SHALL pair profile color with the member's visible name, meet the application's WCAG contrast rules in actual state combinations, and SHALL NOT use color as the only identity signal.
+
+#### Scenario: First parent completes profile setup
+- **WHEN** the first parent successfully creates a household without an existing Profile
+- **THEN** the application requires display-name and profile-color setup before opening family management
 
 #### Scenario: Profile color is shown
 - **WHEN** a member is rendered in an assignment control
@@ -60,11 +76,29 @@ Each member SHALL have a mutable, non-unique display name and a profile color se
 - **THEN** the API denies the request and the target profile remains unchanged
 
 ### Requirement: Parent Family Management View
-The application SHALL provide parents a responsive family-management view listing every active household member with visible display name, username, role, and profile-color indicator, but no recovery emails. It SHALL expose create-parent, create-child, child-password-reset, and confirmed child-removal actions only where authorized and SHALL provide loading, empty, submitting, disabled, success, cancellation, error, and retry states.
+The application SHALL provide parents a responsive family-management view listing every active household member with visible display name, username, role, and profile-color indicator, but no recovery emails. Pending parents SHALL appear with pending status and only resend-welcome, change-email-and-resend, and cancel-pending actions. The view SHALL expose create-parent, create-child, child-password-reset, and confirmed child-removal actions only where authorized and SHALL provide loading, empty, submitting, disabled, success, cancellation, error, and retry states.
 
 #### Scenario: Parent opens family management
 - **WHEN** a parent opens family management
-- **THEN** every active household member appears with only the actions allowed for that member's role
+- **THEN** every active household member and pending parent appears with only the actions allowed for that role and activation state
+
+### Requirement: Administrative Provisioning Boundary
+Public first-parent signup SHALL require the Entry Code only for Cognito `PreSignUp_SignUp`. Parent-provisioned child and additional-parent creation SHALL use IAM-authorized `AdminCreateUser`, SHALL pass parent and household authorization before the Cognito call, and SHALL be restricted by IAM to the Todone user pool. The pre-signup trigger SHALL explicitly permit `PreSignUp_AdminCreateUser` without an Entry Code and reject unexpected trigger sources. Administrative creation SHALL NOT assume or require a prior public signup event.
+
+#### Scenario: Public caller attempts administrative creation
+- **WHEN** a caller without a valid active-parent session and the runtime's IAM authority attempts to create a child or additional parent
+- **THEN** no `AdminCreateUser` call is authorized and no identity or membership is created
+
+#### Scenario: Authorized parent creates a member
+- **WHEN** an active parent submits valid member details through the protected family-account API
+- **THEN** the pool-scoped runtime may invoke `AdminCreateUser` and the pre-signup trigger does not require the public Entry Code
+
+### Requirement: Branded Parent Welcome Email
+Additional-parent creation and resend SHALL use reviewed application-owned plain-text and HTML welcome-email copy delivered by Cognito through SES developer email. The message SHALL contain Cognito's username and one-time setup-code placeholders, explain the shared account-password requirements, and direct the parent to the activation route without placing username, email, setup code, password, or another secret in the URL. The deployment SHALL NOT add dedicated IPs or a fixed-price SES plan for this capability.
+
+#### Scenario: Pending parent receives welcome email
+- **WHEN** Cognito sends or resends an additional-parent welcome message
+- **THEN** the parent receives branded setup instructions and a one-time code without secret values entering application logs or URLs
 
 ### Requirement: Child Account Removal
 A parent SHALL be able to permanently remove a child account only after explicit confirmation describing the deletion consequences. Removal SHALL use an extensible cascade that deletes the child's Cognito identity, Membership, profile, and every child-associated data type known to the deployed application. Each later capability that introduces child-associated records SHALL extend this cascade before that capability is complete. The globally unique username SHALL become reusable only after the complete deployed cascade succeeds. The application SHALL NOT retain the child's name, color, `sub`, credentials, or user-visible historical identity.

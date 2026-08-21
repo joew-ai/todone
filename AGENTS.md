@@ -68,10 +68,15 @@
 
 ## Repository notes
 
+- This is a Vue 3, Vite, TypeScript, Tailwind, and Playwright PWA with Lambda handlers and Terraform configuration.
+- `package.json` provides the canonical local and CI commands documented in `docs/testing/strategy.md`.
+- Local full-stack development uses `npm run dev:full`; initialize the development-only Cognito emulator with `npm run setup:local-cognito` as documented in the testing strategy.
+- Playwright starts the local Vite application through its configured `webServer`; browser tests must not target production by default.
+
 ## Test workflow
 
-- This is a CommonJS Node project with Playwright tests; `package.json` defines no npm scripts. Run the suite with `npx playwright test`.
-- Run one file with `npx playwright test tests/example.spec.ts`; target one browser with `npx playwright test --project=chromium`.
-- Tests run from `tests/` in Chromium, Firefox, and WebKit. CI uses one worker, retries twice, and rejects `test.only`; local runs are parallel with no retries.
-- The current tests navigate to `https://playwright.dev/`. There is no local application, configured `baseURL`, or `webServer`; add those before writing tests that require a local app.
+- Run the required checks with `npm run format:check`, `npm run lint:check`, `npm run typecheck`, `npm run test:unit`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, and `npm run test:a11y`.
+- Run one Playwright file with `npx playwright test tests/e2e/<file>.spec.ts`; target a configured project with `--project=<project-name>` from `playwright.config.ts`.
+- End-to-end and accessibility suites run against the local application in Chromium, Firefox, and WebKit at the configured compact, medium, and wide viewports. CI rejects `test.only`.
+- The local Cognito end-to-end workflow is separate: start the development stack, initialize the emulator as documented, then run `npm run test:e2e:local-auth`.
 - Playwright output is intentionally untracked: `test-results/`, `playwright-report/`, `blob-report/`, and Playwright caches/auth state.

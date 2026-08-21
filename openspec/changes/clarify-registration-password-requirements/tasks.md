@@ -1,8 +1,10 @@
 ## 1. Registration clarity
 
-- [ ] 1.1 Rename the registration-gate field and error copy so it is clearly separate from the new account password; completion: a gate failure directs the user to check the registration access password without exposing gate details.
-- [ ] 1.2 State the configured Cognito account-password requirements before submission and return accessible, actionable password-policy guidance after validation failure; completion: users can determine the required minimum length and character categories without trial-and-error.
+- [ ] 1.1 Rename the registration-gate label to "Entry Code" and use generic Entry Code error copy; completion: the form and error clearly separate the reusable deployment gate from account passwords without exposing or comparing gate values.
+- [ ] 1.2 Add one shared account-password-policy copy/validation definition for at least 8 characters with uppercase, lowercase, number, and symbol; completion: first-parent registration and Forgot Password show the policy before submission and associate the same actionable guidance with a rejected password field, ready for reuse by later family-account password flows.
+- [ ] 1.3 Move all touched authentication labels, help, and error text to `src/i18n/en.yml` and consume it through the typed catalog; completion: the changed surfaces do not retain duplicate hardcoded user-visible copy.
 
 ## 2. Verification
 
-- [ ] 2.1 Add or update unit, component, browser, and accessibility coverage for gate and account-password errors; completion: both errors are distinguishable, announced accessibly, and neither leaks sensitive values.
+- [ ] 2.1 Add or update unit, component, browser, and accessibility coverage for Entry Code and account-password errors on registration and recovery; completion: errors are distinguishable, visibly associated with their fields, announced accessibly, focused for correction, and never leak sensitive values.
+- [ ] 2.2 Run the required format, lint, typecheck, unit, integration, production-build, relevant Playwright, and accessibility checks; completion: all required local checks pass without deployment or production smoke.

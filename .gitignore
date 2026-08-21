@@ -11,9 +11,12 @@ node_modules/
 dist/
 dev-dist/
 coverage/
+.lambda-build/
 
 # Terraform
 terraform/.terraform/
+terraform/*.tfvars
+terraform/*.tfplan
 *.tfplan
 *.tfstate
 *.tfstate.*

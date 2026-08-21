@@ -18,6 +18,11 @@ variable "session_lambda_s3_key" {
   type        = string
 }
 
+variable "session_lambda_source_code_hash" {
+  description = "Base64-encoded SHA-256 hash of the current-session Lambda ZIP, supplied by the release process."
+  type        = string
+}
+
 variable "production_domain" {
   description = "Optional custom domain for the production PWA. Leave empty to use the default CloudFront domain."
   type        = string

@@ -38,6 +38,10 @@ output "static_distribution_id" {
   value = module.frontend.cloudfront_distribution_id
 }
 
+output "static_bucket_name" {
+  value = module.frontend.s3_bucket_name
+}
+
 output "dynamodb_table_name" {
   value = module.table.table_name
 }

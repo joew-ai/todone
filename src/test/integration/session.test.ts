@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { simulateLambda } from '../../../local-dev/lambdaSimulator';
 import { handler as sessionHandler } from '../../../lambdas/session/index';
 import type { TokenVerifier } from '../../../lambdas/session/verifier';
+import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function buildApp(verifier?: TokenVerifier) {
   const app = express();
@@ -25,7 +26,64 @@ const fakeRejectingVerifier: TokenVerifier = {
   },
 };
 
+function gatewayEvent(
+  claims: Record<string, string | number | boolean | string[]>,
+): APIGatewayProxyEventV2 {
+  return {
+    version: '2.0',
+    routeKey: 'GET /api/v1/session',
+    rawPath: '/api/v1/session',
+    rawQueryString: '',
+    headers: {},
+    requestContext: {
+      requestId: 'request-123',
+      http: {
+        method: 'GET',
+        path: '/api/v1/session',
+        protocol: 'HTTP/1.1',
+        sourceIp: '127.0.0.1',
+        userAgent: 'test',
+      },
+      authorizer: { jwt: { claims, scopes: [] } },
+    },
+    isBase64Encoded: false,
+  } as unknown as APIGatewayProxyEventV2;
+}
+
 describe('GET /api/v1/session (integration, through the simulated API Gateway boundary)', () => {
+  it('uses API Gateway verified claims without a second token verification', async () => {
+    const verifier: TokenVerifier = { verify: vi.fn() };
+
+    const response = await sessionHandler(
+      gatewayEvent({
+        sub: 'sub-123',
+        'cognito:username': 'parent1',
+        exp: String(Math.floor(Date.now() / 1000) + 3600),
+      }),
+      verifier,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body ?? '{}')).toMatchObject({
+      sub: 'sub-123',
+      username: 'parent1',
+    });
+    expect(verifier.verify).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for malformed API Gateway authorizer claims without falling back to a bearer token', async () => {
+    const verifier: TokenVerifier = { verify: vi.fn() };
+
+    const response = await sessionHandler(
+      gatewayEvent({ sub: 'sub-123', 'cognito:username': 'parent1' }),
+      verifier,
+    );
+
+    expect(response.statusCode).toBe(401);
+    expect(JSON.parse(response.body ?? '{}')).toEqual({ error: 'unauthorized' });
+    expect(verifier.verify).not.toHaveBeenCalled();
+  });
+
   it('rejects a request with no Authorization header, with no session data', async () => {
     const response = await request(buildApp(fakeValidVerifier)).get('/api/v1/session');
 

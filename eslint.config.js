@@ -15,6 +15,8 @@ export default tseslint.config(
       'node_modules/**',
       '.opencode/**',
       '.claude/**',
+      'terraform/.terraform/**',
+      '.lambda-build/**',
     ],
   },
   js.configs.recommended,

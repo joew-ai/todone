@@ -27,7 +27,7 @@ The foundation SHALL provide a minimal, intentionally temporary username/passwor
 - **THEN** the form remains signed out and presents an accessible retryable error without exposing credential details
 
 ### Requirement: Protected API Boundary
-The API SHALL reject requests without a valid JWT before application handlers execute. The frontend SHALL send its access token only to configured API requests and SHALL NOT cache protected API responses in the service worker.
+The API SHALL reject requests without a valid JWT before application handlers execute. The frontend SHALL send its Cognito ID token only to configured API requests and SHALL NOT cache protected API responses in the service worker.
 
 #### Scenario: Missing token
 - **WHEN** a caller requests the protected endpoint without a token

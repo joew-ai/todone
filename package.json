@@ -22,7 +22,9 @@
     "test:e2e:local-auth": "playwright test tests/local-e2e",
     "test:a11y": "playwright test tests/a11y",
     "setup:verification-account": "tsx scripts/create-verification-account.ts",
-    "setup:local-cognito": "tsx scripts/setup-local-cognito.ts"
+    "setup:local-cognito": "tsx scripts/setup-local-cognito.ts",
+    "deploy:lambdas": "tsx scripts/build-and-deploy-lambdas.ts",
+    "deploy:frontend": "tsx scripts/build-and-deploy-frontend.ts"
   },
   "keywords": [],
   "author": "",

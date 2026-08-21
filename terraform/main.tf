@@ -4,7 +4,7 @@ locals {
 }
 
 # Every family-paas module below is pinned to this reviewed commit
-# (?ref=5263706). Do not float to main; bump the ref deliberately in every
+# (?ref=eeac7ad). Do not float to main; bump the ref deliberately in every
 # module block below after re-reviewing the new commit.
 
 data "terraform_remote_state" "shared" {
@@ -17,7 +17,7 @@ data "terraform_remote_state" "shared" {
 }
 
 module "auth" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/cognito-app-client?ref=5263706"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/cognito-app-client?ref=eeac7ad"
 
   app_name     = local.app_name
   environment  = local.environment
@@ -25,7 +25,7 @@ module "auth" {
 }
 
 module "table" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/dynamodb-table?ref=5263706"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/dynamodb-table?ref=eeac7ad"
 
   table_name  = "${local.app_name}-data-${local.environment}"
   environment = local.environment
@@ -93,26 +93,29 @@ resource "aws_iam_role_policy" "lambda_table_access" {
 }
 
 module "lambdas" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=5263706"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=eeac7ad"
 
   for_each = {
     session = { s3_key = var.session_lambda_s3_key }
   }
 
-  function_name   = each.key
-  app_name        = local.app_name
-  environment     = local.environment
-  lambda_role_arn = aws_iam_role.lambda_role.arn
-  s3_bucket       = data.terraform_remote_state.shared.outputs.lambda_deployments_bucket
-  s3_key          = each.value.s3_key
+  function_name    = each.key
+  app_name         = local.app_name
+  environment      = local.environment
+  lambda_role_arn  = aws_iam_role.lambda_role.arn
+  s3_bucket        = data.terraform_remote_state.shared.outputs.lambda_deployments_bucket
+  s3_key           = each.value.s3_key
+  source_code_hash = var.session_lambda_source_code_hash
 
   environment_variables = {
-    TODONE_TABLE_NAME = module.table.table_name
+    TODONE_TABLE_NAME    = module.table.table_name
+    COGNITO_USER_POOL_ID = data.terraform_remote_state.shared.outputs.cognito_user_pool_id
+    COGNITO_CLIENT_ID    = module.auth.client_id
   }
 }
 
 module "api" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/api-gateway?ref=5263706"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/api-gateway?ref=eeac7ad"
 
   app_name    = local.app_name
   environment = local.environment
@@ -137,7 +140,7 @@ module "api" {
 }
 
 module "frontend" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/frontend-hosting?ref=5263706"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/frontend-hosting?ref=eeac7ad"
 
   app_name             = local.app_name
   environment          = local.environment

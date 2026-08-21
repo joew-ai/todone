@@ -82,7 +82,7 @@ The exact infrastructure/app publication commands are supplied and owned by `fam
 2. Capture current outputs and verify PITR/backup readiness using `backup-restore.md`.
 3. Rerun the saved infrastructure plan or regenerate/re-review it if any input or state changed. Never apply a stale or different plan silently.
 4. Apply non-destructive/backward-compatible infrastructure required by both old and new application versions.
-5. Publish the immutable Lambda artifact and update the API to its reviewed version.
+5. Publish the immutable Lambda artifact and update the API to its reviewed version. `npm run deploy:lambdas` builds every Terraform-managed Lambda into a self-contained artifact and uploads it to the exact S3 key its Terraform module expects; record the printed sha256/size in the release record. It does not touch Terraform state or apply anything.
 6. Publish hashed frontend assets, then update the shell/manifest/service-worker deployment using the platform's atomic/versioned mechanism.
 7. Verify CloudFront serves expected content types and production URL, and that protected responses are `no-store` and absent from service-worker caches.
 8. Run the authorized smoke test.

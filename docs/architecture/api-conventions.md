@@ -8,7 +8,7 @@ The foundation protected probe is:
 
 ```http
 GET /api/v1/session
-Authorization: Bearer <access-token>
+Authorization: Bearer <Cognito-ID-token>
 ```
 
 A successful response has exactly these application fields:
@@ -25,9 +25,9 @@ No household or profile data is returned by the foundation probe.
 
 ## Authentication and authorization
 
-- Protected requests use `Authorization: Bearer <access-token>` over HTTPS. Tokens MUST NOT appear in URLs, logs, error text, analytics, or persistent application data.
+- Protected requests use `Authorization: Bearer <Cognito ID token>` over HTTPS. Tokens MUST NOT appear in URLs, logs, error text, analytics, or persistent application data.
 - API Gateway verifies configured issuer, audience, signature, and expiry before a protected handler runs.
-- Handlers use verified `sub` as caller identity. Username, display name, body fields, route household IDs, and query parameters never establish ownership.
+- Handlers use API Gateway's verified authorizer claims, including `sub`, as caller identity. They do not re-verify the raw bearer token. Username, display name, body fields, route household IDs, and query parameters never establish ownership.
 - Every household route resolves active Membership and applies the server-side authorization matrix in `docs/security/authorization-matrix.md`.
 - A token may be valid while Membership is absent or inactive. Such a request is denied.
 - CORS permits only explicitly configured local origins and the production PWA origin. CORS is not treated as authentication.

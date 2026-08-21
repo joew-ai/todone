@@ -22,5 +22,6 @@ As household work accumulates, parents need a lightweight way to group and narro
 ## Impact
 
 - Depends on Todo editing and history.
+- Delivers the crawl MVP's single-label organization and filtering without adding multiple labels or broader assignment modes.
 - Labels are organizational metadata, not a recurrence, checklist, reward, or completion-state model.
 - Success: a parent can label a Todo and meaningfully filter active and historical views without losing role boundaries.

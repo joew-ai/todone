@@ -21,6 +21,7 @@ Todone proves its core value only when a parent can assign a clear responsibilit
 ## Impact
 
 - Depends on household membership and family accounts.
+- Defines the crawl MVP assignment contract as exactly one active household assignee; unassigned work and multiple assignees remain deferred.
 - Adds active Todo records and a parent/child workflow, but excludes archive/history, labels, recurrence, unassigned work, and multiple assignees.
 - Extends the child-removal cascade to delete every active or completed Todo assigned to the removed child.
 - Success: a parent assigns one Todo and the child independently sees and completes it with the result persisted. Parent inspection of completed work is delivered by `manage-todo-lifecycle-and-history`.

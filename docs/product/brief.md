@@ -23,37 +23,31 @@ Routines, habits, and chore completion in my house
 2. As a child, I want to be able to view my list of todos
 3. As a child, I want to be able to check off my todos, and for my parents to be informed.
 
-## MVP capabilities
-- Application can support multiple users, differented by a login process
-- Profile management is available to all accounts, including updating names and "color".
-- Users can log out
-- User roles (parent, child)
-- Family user management only available to parents
-  - Add user to family
-  - Remove user from family
-  - Change user role
-  - Password updates (passwords are entered by parents, and applied to child or parent accounts).
-  - One parent cannot update another parent's password
-- Parents can add todos
-  - Todos can be assigned to no one, one person, or multiple people
-  - Todos can be assigned to children or parents
-  - Todos can have a due date
-  - Todos can have a single label (ie: "bedtime" or "home repair")
-    - These labels are stored and auto-suggested in the future (much like GitHub PR labels)
-  - Todos can be set to repeat (daily, weekly, monthly)
-  - Repeating chores can be set to not repeat if the previous item is not yet completed
-- Parents and Children can see their list of currently assigned todos
-  - Lists can be filtered by label
-- Parents and Children can see a list of unassigned todos
-- Parents and Children can mark their todos, or unassigned todos, as "done". Parents can mark any todo as done, regardless of assignment.
-- Parents can modify todos
-  - Update (name, due date, assignment, label)
-  - Delete
- 
+## Crawl MVP capabilities
+
+- Deliver a responsive PWA with production sign-in, session restoration, sign-out, and household isolation.
+- Let a first parent register through the lightweight deployment gate, verify a recovery email, and create one household.
+- Support multiple household members with immutable `parent` and `child` roles.
+- Let parents add child and additional-parent accounts. Additional parents verify their own recovery email and choose their own password.
+- Let parents set and reset child passwords and permanently remove child accounts. One parent cannot reset, remove, demote, or otherwise administer another parent.
+- Let every member update only their own non-unique display name and profile color.
+- Let parents create a Todo with a title, zero or one due date, exactly one active household assignee, and zero or one household label.
+- Let children see only their own active assigned Todos. Let parents inspect each household member's active Todos.
+- Let the assignee or any parent complete an active Todo. Parents can edit active Todos and manage their archive, history, reopen, and deletion lifecycle.
+- Let members view only the Todo history permitted by their role and filter their authorized active/history views by one label.
+
+## Deferred beyond crawl
+
+- Role changes, parent removal/demotion, and one parent resetting another parent's password.
+- Unassigned Todos and Todos with multiple assignees.
+- Daily, weekly, and monthly recurrence, including incomplete-previous-item recurrence rules.
+- Public household joining, invitations, shared-device account switching, and native iOS applications.
+- Broader organization, notification, reward, analytics, and integration features not explicitly included in the crawl changes.
+
 ## Non-goals
 - Syncing with other tools (Apple Reminders, Google Tasks, etc.)
 - Massive scaling capabilities
-- Email notifications (users will not even have an email address assigned)
+- Product or reminder email notifications. Cognito may send transactional verification and password-recovery email to adult accounts; child accounts do not require email.
 - Telemetry or tracking
 - Pricing/Upsell model (this is a tool, not a product)
 
@@ -62,8 +56,7 @@ Routines, habits, and chore completion in my house
 - Parents and Children are both roles, which are applied to Users
 
 ## Platforms and devices
-- Mainly targetting web (with a PWA) or native iOS apps
-  - This decision should be made based on AI-assisted developer velocity. If XCode is too slow to work with, we don't want it
+- Target a responsive web PWA on laptop browsers, iPhone, and iPad. Native iOS is deferred beyond crawl.
 
 ## Integrations
 None
@@ -90,7 +83,7 @@ I've included a few design inspiration screenshots:
 Generally the color scheme should feel nature-y and campy. Forest greens, light tans, soft browns, etc.
 
 ## Success criteria
-- App meets all MVP functionality goals
+- App meets all crawl MVP functionality goals
 - App is well tested via unit tests, integration tests, and has been verified with Playwright tests
 - App is thoroughly threat modeled and tested against those goals
 - App has clear developer documentation for future iteration

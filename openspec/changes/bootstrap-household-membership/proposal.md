@@ -24,6 +24,7 @@ An authenticated account is not enough to safely enter Todone. The first parent 
 ## Impact
 
 - Depends on `establish-deployable-pwa-foundation`.
+- Delivers the crawl MVP's production session and first-household boundary.
 - Introduces Household and Membership data owned by the authenticated first parent.
 - The registration gate authorizes creation of an unattached first-parent account but never joins an existing household. Existing-household invitations and public joining, pre-existing account attachment, family account creation, and Todos remain out of scope; later members of a household are created only by a parent in the application.
 - Success: a new username can create exactly one household and cannot access another household.

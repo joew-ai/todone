@@ -22,5 +22,6 @@ The initial completion loop needs controlled correction and durable history. Par
 ## Impact
 
 - Depends on the first family Todo loop.
+- Delivers the crawl MVP's correction, archive, history, reopen, and deletion behavior without broadening the single-assignee contract.
 - Adds `ARCHIVED` and deletion behavior but keeps recurrence outcomes out of scope.
 - Explicit parent deletion is irreversible in the product UI; archive is the normal reversible removal mechanism. Deleted data remains accessible only as a restricted internal audit snapshot until an account-removal policy requires its purge.

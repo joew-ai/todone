@@ -25,5 +25,6 @@ Parents need to create and recover child accounts without email, while children 
 ## Impact
 
 - Depends on household bootstrap and Cognito administrative APIs.
+- Delivers the crawl MVP's immutable parent/child accounts and self-managed profiles.
 - Adds Cognito `AdminCreateUser` and `AdminSetUserPassword` permissions to the runtime, restricted to the Todone pool.
 - Does not add invitations, parent removal/demotion, role changes, or shared-device switching.

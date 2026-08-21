@@ -1,13 +1,13 @@
 output "cognito_user_pool_id" {
-  value = data.terraform_remote_state.shared.outputs.cognito_user_pool_id
+  value = aws_cognito_user_pool.todone.id
 }
 
 output "cognito_user_pool_arn" {
-  value = data.terraform_remote_state.shared.outputs.cognito_user_pool_arn
+  value = aws_cognito_user_pool.todone.arn
 }
 
 output "jwt_issuer" {
-  value = data.terraform_remote_state.shared.outputs.cognito_user_pool_issuer
+  value = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.todone.id}"
 }
 
 output "jwt_audience" {
@@ -58,16 +58,34 @@ output "dynamodb_index_names" {
   value = module.table.global_secondary_index_names
 }
 
+output "lambda_function_names" {
+  value = { for name, lambda in module.lambdas : name => lambda.function_name }
+}
+
+# Backward-compatible foundation outputs retained for release tooling that
+# still addresses the session Lambda directly.
 output "lambda_function_name" {
   value = module.lambdas["session"].function_name
+}
+
+output "lambda_function_arns" {
+  value = { for name, lambda in module.lambdas : name => lambda.function_arn }
 }
 
 output "lambda_function_arn" {
   value = module.lambdas["session"].function_arn
 }
 
+output "lambda_qualified_arns" {
+  value = { for name, lambda in module.lambdas : name => lambda.qualified_arn }
+}
+
 output "lambda_qualified_arn" {
   value = module.lambdas["session"].qualified_arn
+}
+
+output "lambda_versions" {
+  value = { for name, lambda in module.lambdas : name => lambda.version }
 }
 
 output "lambda_version" {
@@ -79,8 +97,16 @@ output "runtime_role_arn" {
 }
 
 output "log_group_names" {
-  value = [
-    module.lambdas["session"].log_group_name,
-    module.api.access_log_group_name,
-  ]
+  value = concat(
+    [for lambda in values(module.lambdas) : lambda.log_group_name],
+    [module.api.access_log_group_name],
+  )
+}
+
+output "pre_signup_log_group_name" {
+  value = module.pre_signup_lambda.log_group_name
+}
+
+output "api_log_group_name" {
+  value = module.api.access_log_group_name
 }

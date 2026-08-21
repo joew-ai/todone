@@ -72,6 +72,6 @@ See `docs/operations/deployment-rollback.md`, `docs/operations/backup-restore.md
 
 ## Scope boundaries
 
-The foundation includes a temporary sign-in probe and protected current-session endpoint only. Household, account-management, Todo, label, history, and recurrence behavior enters the system only when its later OpenSpec change is implemented. The production household bootstrap replaces and removes the temporary sign-in probe rather than preserving two flows.
+The production bootstrap provides first-parent registration, recovery, tab-scoped session restoration, and the initial Household/parent Membership boundary. Later account-management, Todo, label, history, and recurrence behavior enters only with its owning OpenSpec change.
 
 Native iOS packaging, offline mutation queues, third-party integrations, notifications, telemetry, behavioral tracking, and automatic production deployment are out of scope.

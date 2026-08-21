@@ -21,8 +21,8 @@
     "test:e2e": "playwright test tests/e2e",
     "test:e2e:local-auth": "playwright test tests/local-e2e",
     "test:a11y": "playwright test tests/a11y",
-    "setup:verification-account": "tsx scripts/create-verification-account.ts",
     "setup:local-cognito": "tsx scripts/setup-local-cognito.ts",
+    "build:lambdas": "tsx scripts/build-and-deploy-lambdas.ts --build-only",
     "deploy:lambdas": "tsx scripts/build-and-deploy-lambdas.ts",
     "deploy:frontend": "tsx scripts/build-and-deploy-frontend.ts"
   },
@@ -69,9 +69,11 @@
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1097.0",
+    "@aws-sdk/client-dynamodb": "^3.1110.0",
     "amazon-cognito-identity-js": "^6.3.20",
     "aws-jwt-verify": "^5.2.1",
     "express": "^5.2.1",
-    "vue": "^3.5.40"
+    "vue": "^3.5.40",
+    "yaml": "^2.9.0"
   }
 }

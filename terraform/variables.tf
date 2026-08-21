@@ -13,14 +13,31 @@ variable "allowed_origins" {
   }
 }
 
-variable "session_lambda_s3_key" {
-  description = "S3 key of the built current-session Lambda artifact, supplied by the release process. Never a secret value."
-  type        = string
+variable "lambda_artifacts" {
+  description = "Release-supplied S3 key and base64 SHA-256 for every Lambda artifact."
+  type = map(object({
+    s3_key           = string
+    source_code_hash = string
+  }))
+
+  validation {
+    condition = alltrue([
+      for name in ["session", "current-membership", "create-household", "pre-signup"] :
+      contains(keys(var.lambda_artifacts), name)
+    ])
+    error_message = "lambda_artifacts must include every bootstrap Lambda."
+  }
 }
 
-variable "session_lambda_source_code_hash" {
-  description = "Base64-encoded SHA-256 hash of the current-session Lambda ZIP, supplied by the release process."
+variable "registration_gate_password_hash" {
+  description = "Lower-case hexadecimal SHA-256 of the reusable registration gate password. Never output or log this value."
   type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^[a-f0-9]{64}$", var.registration_gate_password_hash))
+    error_message = "registration_gate_password_hash must be a lower-case SHA-256 hex digest."
+  }
 }
 
 variable "production_domain" {

@@ -8,9 +8,26 @@ import express from 'express';
 import { simulateLambda } from './lambdaSimulator';
 import { handler as healthHandler } from '../lambdas/health/index';
 import { handler as sessionHandler } from '../lambdas/session/index';
+import { handler as currentMembershipHandler } from '../lambdas/households/current';
+import { handler as createHouseholdHandler } from '../lambdas/households/create';
+import { InMemoryHouseholdRepository } from '../lambdas/households/repository';
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
+const householdRepository = new InMemoryHouseholdRepository();
+
+app.use(express.json());
+app.use(
+  (error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (error instanceof SyntaxError) {
+      res
+        .status(400)
+        .json({ error: { code: 'INVALID_JSON', message: 'The request body must be valid JSON.' } });
+      return;
+    }
+    next(error);
+  },
+);
 
 app.get('/api/v1/health', async (req, res) => {
   await simulateLambda(healthHandler, req, res);
@@ -20,9 +37,27 @@ app.get('/api/v1/session', async (req, res) => {
   await simulateLambda(sessionHandler, req, res);
 });
 
+app.get('/api/v1/memberships/current', async (req, res) => {
+  await simulateLambda(
+    (event) => currentMembershipHandler(event, { repository: householdRepository }),
+    req,
+    res,
+  );
+});
+
+app.post('/api/v1/households', async (req, res) => {
+  await simulateLambda(
+    (event) => createHouseholdHandler(event, { repository: householdRepository }),
+    req,
+    res,
+  );
+});
+
 app.listen(PORT, () => {
   console.log(`Todone local API simulator running on http://localhost:${PORT}`);
   console.log('Endpoints:');
   console.log('  GET /api/v1/health');
   console.log('  GET /api/v1/session');
+  console.log('  GET /api/v1/memberships/current');
+  console.log('  POST /api/v1/households');
 });

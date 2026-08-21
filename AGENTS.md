@@ -18,6 +18,14 @@
 - Do not change approved requirements silently.
 - Never commit secrets or production data.
 
+## Code conventions
+
+- Name stable cross-boundary values (API paths, header names, error codes, record kinds, field limits, and storage key formats) with constants or factories. Keep truly local literals local.
+- Keep user-visible frontend copy in src/i18n/en.yml; API messages must be generic domain messages, not instructions tied to a particular UI.
+- Reuse shared request, response, repository, and validation utilities when they preserve an established contract. Record request IDs and outcomes for successful as well as failed API requests.
+- Prefer descriptive helper names over terse persistence or serialization abbreviations.
+- Treat sign-out as a fail-safe local privacy boundary: clear local credentials and private UI state even if an SDK cleanup call throws. Add server sign-out only when a server-side sign-out contract exists.
+
 ## Required workflow
 
 1. Read the relevant specification and ADRs.

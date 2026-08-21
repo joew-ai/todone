@@ -9,12 +9,12 @@ const GENERIC_INVALID_CREDENTIALS: AuthErrorResult = {
 };
 
 const NETWORK_ERROR: AuthErrorResult = {
-  message: 'Could not reach the server. Check your connection and try again.',
+  message: messages.generic.networkError,
   recoverable: true,
 };
 
 const UNEXPECTED_ERROR: AuthErrorResult = {
-  message: 'Something went wrong. Please try again.',
+  message: messages.generic.unexpectedError,
   recoverable: true,
 };
 
@@ -47,7 +47,7 @@ export function mapAuthError(error: unknown): AuthErrorResult {
   }
 }
 
-function getErrorCode(error: unknown): string | undefined {
+export function getErrorCode(error: unknown): string | undefined {
   if (typeof error !== 'object' || error === null) {
     return undefined;
   }
@@ -62,3 +62,10 @@ function getErrorCode(error: unknown): string | undefined {
   const name = (error as { name?: unknown }).name;
   return typeof name === 'string' ? name : undefined;
 }
+
+export function getErrorMessage(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : undefined;
+}
+import { messages } from '../i18n/messages';

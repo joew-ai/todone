@@ -1,0 +1,178 @@
+import { expect, test, type Page, type Route } from '@playwright/test';
+
+const membership = {
+  memberId: 'synthetic-member',
+  role: 'parent',
+  household: { householdId: 'synthetic-house', name: 'River House', timezone: 'America/Chicago' },
+};
+
+function jwt(tokenUse: 'id' | 'access'): string {
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'none', kid: 'test' })}.${encode({
+    sub: 'synthetic-sub',
+    'cognito:username': 'ParentOne',
+    token_use: tokenUse,
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    iat: Math.floor(Date.now() / 1000),
+    aud: 'test-client',
+    client_id: 'test-client',
+    iss: 'https://example.invalid/test',
+  })}.test-signature`;
+}
+
+async function mockCognito(page: Page): Promise<void> {
+  const respond = async (route: Route) => {
+    const target = route.request().headers()['x-amz-target'] ?? '';
+    if (target.endsWith('.InitiateAuth')) {
+      await route.fulfill({
+        json: {
+          AuthenticationResult: {
+            IdToken: jwt('id'),
+            AccessToken: jwt('access'),
+            RefreshToken: 'synthetic-refresh',
+            ExpiresIn: 3600,
+          },
+        },
+      });
+      return;
+    }
+    if (target.endsWith('.SignUp')) {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      expect(body).not.toHaveProperty('householdId');
+      await route.fulfill({ json: { UserConfirmed: false, UserSub: 'synthetic-sub' } });
+      return;
+    }
+    if (target.endsWith('.ForgotPassword')) {
+      await route.fulfill({
+        json: {
+          CodeDeliveryDetails: {
+            DeliveryMedium: 'EMAIL',
+            Destination: 'p***@e***',
+            AttributeName: 'email',
+          },
+        },
+      });
+      return;
+    }
+    await route.fulfill({ json: {} });
+  };
+  await page.route('https://cognito-idp.local.amazonaws.com/**', respond);
+  await page.route('http://localhost:9229/**', respond);
+}
+
+async function signIn(page: Page, attached: boolean): Promise<void> {
+  await page.route('**/api/v1/memberships/current', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'cache-control': 'no-store' },
+      json: { membership: attached ? membership : null },
+    }),
+  );
+  await page.getByLabel('Username').fill('ParentOne');
+  await page.getByLabel('Password').fill('StrongPassword123!');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+}
+
+test.beforeEach(async ({ page }) => {
+  await mockCognito(page);
+  await page.goto('/');
+});
+
+test('registers, verifies email, signs in, creates a household, and reaches onboarding', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Create first-parent account' }).click();
+  await page.getByLabel('Username').fill('ParentOne');
+  await page.getByLabel('Recovery email').fill('parent@example.invalid');
+  await page.getByLabel('Password', { exact: true }).fill('StrongPassword123!');
+  await page.getByLabel('Registration password').fill('synthetic-gate');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Verify your recovery email' })).toBeVisible();
+  await page.getByLabel('Verification code').fill('123456');
+  await page.getByRole('button', { name: 'Verify email' }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+
+  await page.route('**/api/v1/memberships/current', (route) =>
+    route.fulfill({ json: { membership: null } }),
+  );
+  await page.route('**/api/v1/households', async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body).toEqual({ name: 'River House', timezone: 'America/Chicago' });
+    expect(route.request().headers()['idempotency-key']).toBeTruthy();
+    await route.fulfill({
+      status: 201,
+      headers: { 'cache-control': 'no-store' },
+      json: { membership },
+    });
+  });
+  await signIn(page, false);
+  await expect(page.getByRole('heading', { name: 'Create your household' })).toBeVisible();
+  await page.getByLabel('Household name').fill('River House');
+  await page.getByLabel('Household timezone').selectOption('America/Chicago');
+  await page.getByRole('button', { name: 'Create household' }).click();
+  await expect(page.getByRole('heading', { name: 'River House' })).toBeVisible();
+  await expect(page.getByText('Next, add your family members')).toBeVisible();
+});
+
+test('restores only the current tab from sessionStorage and completely clears sign-out state', async ({
+  page,
+}) => {
+  await signIn(page, true);
+  await expect(page.getByRole('heading', { name: 'River House' })).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      Object.keys(sessionStorage).some((key) => key === 'todone.auth.test-client.localSession'),
+    ),
+  ).toBe(true);
+  expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  expect(page.url()).not.toContain(jwt('id'));
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'River House' })).toBeVisible();
+  const indexedDatabases = await page.evaluate(async () =>
+    (await indexedDB.databases()).map((db) => db.name),
+  );
+  expect(indexedDatabases).toEqual([]);
+  const privateCacheEntries = await page.evaluate(async () => {
+    const entries = await Promise.all(
+      (await caches.keys()).map(async (name) => (await caches.open(name)).keys()),
+    );
+    return entries.flat().filter((request) => request.url.includes('/api/'));
+  });
+  expect(privateCacheEntries).toEqual([]);
+
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByText('River House')).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      Object.keys(sessionStorage).filter(
+        (key) => key.includes('CognitoIdentityServiceProvider') || key.startsWith('todone.auth.'),
+      ),
+    ),
+  ).toEqual([]);
+});
+
+test('supports parent Forgot Password without account disclosure', async ({ page }) => {
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await page.getByLabel('Username').fill('UnknownOrParent');
+  await page.getByRole('button', { name: 'Send recovery code' }).click();
+  await expect(page.getByText('If the account is eligible')).toBeVisible();
+  await page.getByLabel('Recovery code').fill('123456');
+  await page.getByLabel('New password').fill('NewStrongPassword123!');
+  await page.getByRole('button', { name: 'Reset password' }).click();
+  await expect(page.getByText('Password reset. Sign in with your new password.')).toBeVisible();
+});
+
+test('requires a selectable timezone when browser detection is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = Intl.DateTimeFormat.prototype.resolvedOptions;
+    Intl.DateTimeFormat.prototype.resolvedOptions = function () {
+      return { ...original.call(this), timeZone: '' };
+    };
+  });
+  await page.reload();
+  await signIn(page, false);
+  await expect(page.getByLabel('Household timezone')).toHaveValue('');
+  await expect(page.getByLabel('Household timezone')).toHaveAttribute('required', '');
+});

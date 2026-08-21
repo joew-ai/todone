@@ -11,12 +11,22 @@ type Handler = (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyStructu
  * Express, so handlers never depend on Express-specific types.
  */
 export async function simulateLambda(handler: Handler, req: Request, res: Response): Promise<void> {
+  let body: string | undefined;
+  try {
+    body = serializeRequestBody(req.body);
+  } catch {
+    res
+      .status(400)
+      .json({ error: { code: 'INVALID_JSON', message: 'The request body is invalid.' } });
+    return;
+  }
   const event: APIGatewayProxyEventV2 = {
     version: '2.0',
     routeKey: `${req.method} ${req.path}`,
     rawPath: req.path,
     rawQueryString: '',
     headers: req.headers as Record<string, string>,
+    body,
     requestContext: {
       requestId: randomUUID(),
       http: {
@@ -45,4 +55,8 @@ export async function simulateLambda(handler: Handler, req: Request, res: Respon
     console.error('Unhandled simulator error', error instanceof Error ? error.message : error);
     res.status(500).json({ error: 'internal_error' });
   }
+}
+
+export function serializeRequestBody(body: unknown): string | undefined {
+  return body === undefined ? undefined : JSON.stringify(body);
 }

@@ -3,12 +3,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const authenticateUserMock = vi.fn();
 const signOutMock = vi.fn();
 const getSignInUserSessionMock = vi.fn();
+const getSessionMock = vi.fn();
+const getCurrentUserMock = vi.fn();
+const signUpMock = vi.fn();
+const confirmRegistrationMock = vi.fn();
+const resendConfirmationCodeMock = vi.fn();
+const forgotPasswordMock = vi.fn();
+const confirmPasswordMock = vi.fn();
+const poolConfigs: unknown[] = [];
 
 vi.mock('amazon-cognito-identity-js', () => {
   class CognitoUserPool {
-    constructor(public config: unknown) {}
+    constructor(public config: unknown) {
+      poolConfigs.push(config);
+    }
+    getCurrentUser() {
+      return getCurrentUserMock();
+    }
+    signUp(...args: unknown[]) {
+      return signUpMock(...args);
+    }
   }
   class AuthenticationDetails {
+    constructor(public data: unknown) {}
+  }
+  class CognitoUserAttribute {
     constructor(public data: unknown) {}
   }
   class CognitoUser {
@@ -22,8 +41,23 @@ vi.mock('amazon-cognito-identity-js', () => {
     getSignInUserSession() {
       return getSignInUserSessionMock();
     }
+    getSession(callback: unknown) {
+      getSessionMock(callback);
+    }
+    confirmRegistration(...args: unknown[]) {
+      return confirmRegistrationMock(...args);
+    }
+    resendConfirmationCode(...args: unknown[]) {
+      return resendConfirmationCodeMock(...args);
+    }
+    forgotPassword(callbacks: unknown) {
+      return forgotPasswordMock(callbacks);
+    }
+    confirmPassword(...args: unknown[]) {
+      return confirmPasswordMock(...args);
+    }
   }
-  return { CognitoUserPool, AuthenticationDetails, CognitoUser };
+  return { CognitoUserPool, AuthenticationDetails, CognitoUser, CognitoUserAttribute };
 });
 
 const sendMock = vi.fn();
@@ -38,7 +72,10 @@ vi.mock('@aws-sdk/client-cognito-identity-provider', () => {
   class InitiateAuthCommand {
     constructor(public input: unknown) {}
   }
-  return { CognitoIdentityProviderClient, InitiateAuthCommand };
+  class SignUpCommand {
+    constructor(public input: unknown) {}
+  }
+  return { CognitoIdentityProviderClient, InitiateAuthCommand, SignUpCommand };
 });
 
 const { AuthClient } = await import('../../services/authClient');
@@ -75,10 +112,28 @@ function buildLocalClient() {
 
 describe('AuthClient', () => {
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
     authenticateUserMock.mockReset();
     signOutMock.mockReset();
     getSignInUserSessionMock.mockReset();
+    getSessionMock.mockReset();
+    getCurrentUserMock.mockReset();
+    signUpMock.mockReset();
+    confirmRegistrationMock.mockReset();
+    resendConfirmationCodeMock.mockReset();
+    forgotPasswordMock.mockReset();
+    confirmPasswordMock.mockReset();
     sendMock.mockReset();
+    poolConfigs.length = 0;
+  });
+
+  it('configures Cognito to persist sessions in sessionStorage, never localStorage', () => {
+    buildClient();
+
+    expect(poolConfigs).toHaveLength(1);
+    expect(poolConfigs[0]).toEqual(expect.objectContaining({ Storage: sessionStorage }));
+    expect(localStorage).toHaveLength(0);
   });
 
   it('returns a success result with idToken, accessToken, and expiresAt', async () => {
@@ -95,6 +150,88 @@ describe('AuthClient', () => {
       expect(result.session.accessToken).toBe('access-token-value');
       expect(result.session.expiresAt).toBeInstanceOf(Date);
     }
+  });
+
+  it('registers an unattached parent with email and temporary gate validation data', async () => {
+    signUpMock.mockImplementation((_username, _password, _attributes, _validationData, callback) =>
+      callback(null, {}),
+    );
+    const result = await buildClient().registerFirstParent(
+      'ParentOne',
+      'StrongPassword123!',
+      'parent@example.invalid',
+      'gate-secret',
+    );
+    expect(result).toEqual({ kind: 'success' });
+    expect(signUpMock).toHaveBeenCalledWith(
+      'ParentOne',
+      'StrongPassword123!',
+      [expect.objectContaining({ data: { Name: 'email', Value: 'parent@example.invalid' } })],
+      [
+        expect.objectContaining({
+          data: { Name: 'registrationGatePassword', Value: 'gate-secret' },
+        }),
+      ],
+      expect.any(Function),
+    );
+  });
+
+  it.each([
+    [{ code: 'UsernameExistsException' }, 'username', 'already in use'],
+    [
+      { code: 'LambdaValidationException', message: 'PreSignUp failed: INVALID_REGISTRATION_GATE' },
+      'registrationGatePassword',
+      'not valid',
+    ],
+    [
+      { code: 'LambdaValidationException', message: 'PreSignUp failed: REGISTRATION_CLOSED' },
+      undefined,
+      'closed',
+    ],
+  ])('maps registration failures safely', async (error, field, message) => {
+    signUpMock.mockImplementation((_a, _b, _c, _d, callback) => callback(error));
+    const result = await buildClient().registerFirstParent(
+      'ParentOne',
+      'Password',
+      'p@example.invalid',
+      'private-gate',
+    );
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.field).toBe(field);
+      expect(result.message).toContain(message);
+      expect(result.message).not.toContain('private-gate');
+    }
+  });
+
+  it('confirms registration and maps invalid or expired codes to field guidance', async () => {
+    confirmRegistrationMock.mockImplementation((_code, _forceAlias, callback) =>
+      callback({ code: 'ExpiredCodeException' }),
+    );
+    const result = await buildClient().confirmRegistration('parent', '123456');
+    expect(result).toMatchObject({ kind: 'error', field: 'code', recoverable: true });
+  });
+
+  it('resends confirmation codes', async () => {
+    resendConfirmationCodeMock.mockImplementation((callback) => callback(null, {}));
+    await expect(buildClient().resendConfirmationCode('parent')).resolves.toEqual({
+      kind: 'success',
+    });
+  });
+
+  it('keeps Forgot Password initiation generic for an unknown username', async () => {
+    forgotPasswordMock.mockImplementation((callbacks) =>
+      callbacks.onFailure({ code: 'UserNotFoundException' }),
+    );
+    await expect(buildClient().forgotPassword('unknown')).resolves.toEqual({ kind: 'success' });
+  });
+
+  it('confirms a Forgot Password recovery code and maps weak passwords', async () => {
+    confirmPasswordMock.mockImplementation((_code, _password, callbacks) =>
+      callbacks.onFailure({ code: 'InvalidPasswordException' }),
+    );
+    const result = await buildClient().confirmForgotPassword('parent', '123456', 'weak');
+    expect(result).toMatchObject({ kind: 'error', field: 'password', recoverable: true });
   });
 
   it('returns a generic invalid-credentials error for incorrect username or password', async () => {
@@ -152,14 +289,83 @@ describe('AuthClient', () => {
     expect(signOutMock).toHaveBeenCalledTimes(1);
     expect(client.getIdToken()).toBeNull();
   });
+
+  it('restores a valid Cognito session in the same tab', async () => {
+    const session = buildSession({ idToken: 'restored-token' });
+    const restoredUser = {
+      getSession: (callback: (error: unknown, value: unknown) => void) => callback(null, session),
+      getSignInUserSession: () => session,
+      signOut: signOutMock,
+    };
+    getCurrentUserMock.mockReturnValue(restoredUser);
+
+    const client = buildClient();
+    const restored = await client.restoreSession();
+
+    expect(restored?.idToken).toBe('restored-token');
+    expect(client.getIdToken()).toBe('restored-token');
+  });
+
+  it('clears Cognito session keys when restoration fails', async () => {
+    sessionStorage.setItem('CognitoIdentityServiceProvider.client-id.LastAuthUser', 'parent1');
+    sessionStorage.setItem(
+      'CognitoIdentityServiceProvider.client-id.parent1.idToken',
+      'private-token',
+    );
+    sessionStorage.setItem('unrelated', 'keep-me');
+    getCurrentUserMock.mockReturnValue({
+      getSession: (callback: (error: unknown) => void) => callback(new Error('expired')),
+    });
+
+    const restored = await buildClient().restoreSession();
+
+    expect(restored).toBeNull();
+    expect(
+      sessionStorage.getItem('CognitoIdentityServiceProvider.client-id.LastAuthUser'),
+    ).toBeNull();
+    expect(
+      sessionStorage.getItem('CognitoIdentityServiceProvider.client-id.parent1.idToken'),
+    ).toBeNull();
+    expect(sessionStorage.getItem('unrelated')).toBe('keep-me');
+  });
+
+  it('signOut removes all app-client auth keys, including a restored user session', () => {
+    sessionStorage.setItem('CognitoIdentityServiceProvider.client-id.LastAuthUser', 'parent1');
+    sessionStorage.setItem(
+      'CognitoIdentityServiceProvider.client-id.parent1.accessToken',
+      'private-token',
+    );
+    sessionStorage.setItem('todone.auth.client-id.localSession', '{"idToken":"private"}');
+    sessionStorage.setItem('unrelated', 'keep-me');
+    getCurrentUserMock.mockReturnValue({ signOut: signOutMock });
+
+    const client = buildClient();
+    client.signOut();
+
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect([...Array(sessionStorage.length)].map((_, index) => sessionStorage.key(index))).toEqual([
+      'unrelated',
+    ]);
+    expect(localStorage).toHaveLength(0);
+  });
 });
 
 describe('AuthClient (LOCAL DEVELOPMENT ONLY, localEndpoint set)', () => {
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
     authenticateUserMock.mockReset();
     signOutMock.mockReset();
     getSignInUserSessionMock.mockReset();
+    getSessionMock.mockReset();
+    getCurrentUserMock.mockReset();
+    signUpMock.mockReset();
+    confirmRegistrationMock.mockReset();
+    resendConfirmationCodeMock.mockReset();
+    forgotPasswordMock.mockReset();
+    confirmPasswordMock.mockReset();
     sendMock.mockReset();
+    poolConfigs.length = 0;
   });
 
   it('uses USER_PASSWORD_AUTH instead of SRP, and never calls authenticateUser', async () => {
@@ -221,5 +427,38 @@ describe('AuthClient (LOCAL DEVELOPMENT ONLY, localEndpoint set)', () => {
     expect(client.getIdToken()).toBeNull();
     // The local path never touches the SRP CognitoUser at all.
     expect(signOutMock).not.toHaveBeenCalled();
+  });
+
+  it('restores a valid local session after a same-tab reload and clears it on sign-out', async () => {
+    sendMock.mockResolvedValue({
+      AuthenticationResult: {
+        IdToken: 'local-id-token',
+        AccessToken: 'local-access-token',
+        ExpiresIn: 3600,
+      },
+    });
+    await buildLocalClient().signIn('localdev', 'LocalDevPass123!');
+
+    expect(localStorage).toHaveLength(0);
+    const reloadedClient = buildLocalClient();
+    const restored = await reloadedClient.restoreSession();
+    expect(restored?.idToken).toBe('local-id-token');
+
+    reloadedClient.signOut();
+    expect(await buildLocalClient().restoreSession()).toBeNull();
+  });
+
+  it('rejects and removes an expired local session', async () => {
+    sessionStorage.setItem(
+      'todone.auth.local-client-id.localSession',
+      JSON.stringify({
+        idToken: 'expired-id-token',
+        accessToken: 'expired-access-token',
+        expiresAt: new Date(Date.now() - 1000).toISOString(),
+      }),
+    );
+
+    expect(await buildLocalClient().restoreSession()).toBeNull();
+    expect(sessionStorage.getItem('todone.auth.local-client-id.localSession')).toBeNull();
   });
 });

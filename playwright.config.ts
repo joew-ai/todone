@@ -16,7 +16,8 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm run dev:full',
+    command:
+      'VITE_COGNITO_USER_POOL_ID=local_test VITE_COGNITO_CLIENT_ID=test-client VITE_COGNITO_REGION=local VITE_COGNITO_LOCAL_ENDPOINT=http://localhost:9229 npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

@@ -6,16 +6,6 @@
 - Every remote step has loading, success, empty where applicable, recoverable error, retry, disabled/submitting, and signed-out/session-expired behavior as defined in `interaction-states.md`.
 - A return visit restores the current session when valid, resolves active Membership, and routes by membership and onboarding state.
 - The application never exposes another household while resolving an invalid route or resource ID.
-- The foundation temporary sign-in probe exists only until the production session/bootstrap flow is delivered; the two flows do not coexist as permanent alternatives.
-
-## Foundation authentication proof
-
-1. An operator creates a verification-only Cognito account through an administrator setup command; there is no self-registration in the foundation.
-2. The signed-out user enters username and password in the temporary accessible form.
-3. The PWA authenticates with Cognito, stores only the temporary session material allowed by the security model, and calls `GET /api/v1/session` with the ID token.
-4. The page renders only `sub`, `username`, and `expiresAt` from the protected response.
-5. Invalid credentials keep the user signed out. Network errors preserve the opportunity to retry without exposing credentials.
-6. `bootstrap-household-membership` replaces this form, account-setup path, and obsolete tests after production registration, sign-in, recovery, restoration, and sign-out pass.
 
 ## Production session and first household
 

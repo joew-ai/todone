@@ -74,7 +74,7 @@ The UI does not claim a Todo is complete before server confirmation. While submi
 
 ## Component-specific requirements
 
-- **Authentication:** Username and password labels, announced invalid-credential/network states, keyboard submit, and no credential disclosure. The foundation probe is temporary and must be removed when production session flows ship.
+- **Authentication:** Username/password sign-in, first-parent registration, email confirmation, recovery, and household bootstrap use persistent labels, announced outcomes, keyboard submit, focused field errors, and no credential disclosure.
 - **Member identity:** Show display name plus color; show username and role only on surfaces that require them. Recovery email is private to its owning parent.
 - **Todo controls:** Accessible names include title and relevant due, assignee, completion, or recurrence status without producing excessively repetitive list speech.
 - **Comboboxes and suggestions:** Label and timezone controls implement keyboard selection, active descendant or native semantics, no-match text, explicit create versus select wording, and escape/cancel behavior.

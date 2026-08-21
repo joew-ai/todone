@@ -55,7 +55,7 @@ Then start the app and local API in a separate terminal:
 npm run dev:full
 ```
 
-Open `http://localhost:3000`, enter the local verification account, and confirm the temporary form reaches its signed-in state. `cognito-local` supports `USER_PASSWORD_AUTH`, not SRP, so `AuthClient` uses that flow only when `VITE_COGNITO_LOCAL_ENDPOINT` is explicitly present. The ordinary deployed configuration continues to use Cognito SRP. Local JWT verification fetches the local emulator JWKS and caches it; production verification continues to validate the real Cognito issuer, audience, token use, and JWKS.
+Open `http://localhost:3000`, enter the local development account, and confirm the production sign-in flow reaches household creation or the existing household landing. `cognito-local` supports `USER_PASSWORD_AUTH`, not SRP, so `AuthClient` uses that flow only when `VITE_COGNITO_LOCAL_ENDPOINT` is explicitly present. The ordinary deployed configuration continues to use Cognito SRP. Local JWT verification fetches the local emulator JWKS and caches it; production verification continues to validate the real Cognito issuer, audience, token use, and JWKS.
 
 To reset local identities, stop the emulator, delete `.cognito/db/`, delete `.env.local`, and repeat the bootstrap steps. This deletes synthetic local data only.
 
@@ -101,7 +101,6 @@ Components cover form labels, keyboard behavior, focus movement, live-region ann
 
 Critical flows run through the browser against a local application and local API/auth test environment. They cover:
 
-- Foundation temporary username sign-in, invalid credentials, network retry, protected session call, and eventual removal by bootstrap.
 - Production registration gate including closed registration, Cognito email confirmation/resend, sign-in, current-tab restoration from `sessionStorage`, Forgot Password, sign-out, household creation, and onboarding. Browser tests assert that tokens never enter `localStorage`, IndexedDB, URLs, or service-worker caches.
 - Parent member creation/reset/removal and self-profile editing.
 - Parent Todo assignment, child completion, parent history, undo/reopen, archive/restore, and delete confirmation/cancellation.
@@ -151,6 +150,6 @@ A failing required check blocks release. Flaky tests are failures to diagnose, n
 
 ## Production smoke boundary
 
-The production smoke is small and non-destructive: load the deployed PWA, authenticate the verification account through the live temporary form, call the protected session endpoint, verify exactly `sub`, `username`, and `expiresAt`, sign out, and confirm an unauthenticated call is rejected. It happens only after explicit human deployment authorization and uses no real household/Todo data.
+The bootstrap production smoke uses an explicitly authorized synthetic first-parent identity: exercise the configured registration gate, email confirmation, sign-in, household creation, current-tab restoration, sign-out, Forgot Password, invalid/closed registration, and privacy-safe log inspection. It happens only after explicit human deployment authorization. The release owner removes or clearly identifies the synthetic household according to the approved production-data procedure; agents do not run this smoke autonomously.
 
 Agents do not run this smoke autonomously. If deployment is not authorized, record local and plan evidence and leave the production task incomplete.

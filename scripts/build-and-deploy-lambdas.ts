@@ -14,6 +14,7 @@
  * Usage:
  *   npm run deploy:lambdas
  *   npm run deploy:lambdas -- session       # build/publish a subset by name
+ *   npm run build:lambdas                   # build locally; never publish
  */
 import { execFileSync, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -24,7 +25,12 @@ import * as esbuild from 'esbuild';
 // Must exactly match terraform/main.tf's `module.lambdas` for_each keys.
 // `lambdas/health` is a local-simulator example only and is deliberately
 // excluded -- it is never deployed.
-const DEPLOYABLE_LAMBDAS = ['session'];
+const DEPLOYABLE_LAMBDAS = {
+  session: 'lambdas/session/index.ts',
+  'current-membership': 'lambdas/households/current.ts',
+  'create-household': 'lambdas/households/create.ts',
+  'pre-signup': 'lambdas/pre-signup/index.ts',
+} as const;
 
 // Matches terraform/main.tf `locals.app_name` / `locals.environment`.
 const APP_NAME = 'todone';
@@ -47,9 +53,10 @@ interface BuildResult {
 }
 
 async function buildLambda(name: string): Promise<BuildResult> {
-  const entry = join(process.cwd(), 'lambdas', name, 'index.ts');
+  const relativeEntry = DEPLOYABLE_LAMBDAS[name as keyof typeof DEPLOYABLE_LAMBDAS];
+  const entry = relativeEntry && join(process.cwd(), relativeEntry);
   if (!existsSync(entry)) {
-    throw new Error(`No lambdas/${name}/index.ts found.`);
+    throw new Error(`No entry point configured for ${name}.`);
   }
 
   const outDir = join(BUILD_DIR, name);
@@ -94,14 +101,14 @@ function publish(result: BuildResult): void {
 }
 
 async function main(): Promise<void> {
-  const requested = process.argv.slice(2);
-  const names = requested.length > 0 ? requested : DEPLOYABLE_LAMBDAS;
+  const buildOnly = process.argv.includes('--build-only');
+  const requested = process.argv.slice(2).filter((argument) => argument !== '--build-only');
+  const knownNames = Object.keys(DEPLOYABLE_LAMBDAS);
+  const names = requested.length > 0 ? requested : knownNames;
 
   for (const name of names) {
-    if (!DEPLOYABLE_LAMBDAS.includes(name)) {
-      throw new Error(
-        `"${name}" is not a deployable Lambda. Known: ${DEPLOYABLE_LAMBDAS.join(', ')}`,
-      );
+    if (!knownNames.includes(name)) {
+      throw new Error(`"${name}" is not a deployable Lambda. Known: ${knownNames.join(', ')}`);
     }
   }
 
@@ -109,12 +116,16 @@ async function main(): Promise<void> {
   for (const name of names) {
     console.log(`Building ${name}...`);
     const result = await buildLambda(name);
-    console.log(`Publishing ${name} to s3://${DEPLOYMENTS_BUCKET}/${result.s3Key}...`);
-    publish(result);
+    if (!buildOnly) {
+      console.log(`Publishing ${name} to s3://${DEPLOYMENTS_BUCKET}/${result.s3Key}...`);
+      publish(result);
+    }
     results.push(result);
   }
 
-  console.log('\nPublished artifacts (record these in the release record):\n');
+  console.log(
+    `\n${buildOnly ? 'Built' : 'Published'} artifacts (record these in the release record):\n`,
+  );
   for (const r of results) {
     console.log(`  ${r.name}`);
     console.log(`    s3Key:  ${r.s3Key}`);

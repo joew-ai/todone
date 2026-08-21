@@ -5,7 +5,6 @@
 | Principal | Meaning |
 | --- | --- |
 | Anonymous | No valid Cognito JWT. |
-| Verification account | Foundation-only Cognito user used to prove sign-in and the protected session endpoint; no product household authority. |
 | Unattached account | Authenticated first-parent registrant with no Membership. |
 | Child | Authenticated user with an active immutable `child` Membership. |
 | Parent | Authenticated user with an active immutable `parent` Membership. All parents are peers. |
@@ -14,14 +13,13 @@
 
 Authentication proves a Cognito `sub`. Each application request then resolves active Membership. UI visibility is not authorization.
 
-## Foundation and session
+## Session
 
-| Operation | Anonymous | Verification | Unattached | Child | Parent | Additional server rule |
-| --- | --- | --- | --- | --- | --- | --- |
-| Load public PWA assets | Allow | Allow | Allow | Allow | Allow | Public static assets only; no private API cache. |
-| Use temporary sign-in form | Allow | Allow | Allow | Allow | Allow | Form authenticates only; it is removed by production bootstrap. |
-| Read foundation current session | Deny | Self | Self | Self | Self | Valid JWT; return exactly `sub`, `username`, `expiresAt`. |
-| Sign out | No session | Self | Self | Self | Self | Clears caller session only. |
+| Operation | Anonymous | Unattached | Child | Parent | Additional server rule |
+| --- | --- | --- | --- | --- | --- |
+| Load public PWA assets | Allow | Allow | Allow | Allow | Public static assets only; no private API cache. |
+| Read current session | Deny | Self | Self | Self | Valid JWT; return exactly `sub`, `username`, `expiresAt`. |
+| Sign out | No session | Self | Self | Self | Clears caller session only. |
 
 ## Bootstrap and recovery
 
@@ -79,7 +77,6 @@ Authentication proves a Cognito `sub`. Each application request then resolves ac
 | --- | --- | --- |
 | Terraform plan | Deny | Read-only plan may be prepared by an agent; a human reviews destructive changes and cost. |
 | Terraform apply / production deploy | Deny | Explicit human authorization required for each production change. CI/agent success is not authorization. |
-| Create foundation verification account | Deny | Authorized setup command; credentials handled out of band and removed with temporary flow. |
 | Inspect/repair Cognito orphan | Deny | Authorized operator, pool-scoped commands, no secret logging. |
 | DynamoDB restore | Deny | Authorized operator restores to a separate table, verifies data/isolation, and separately approves cutover. |
 | Roll back frontend/Lambda | Deny | Human release owner selects retained artifact and verifies smoke path. |

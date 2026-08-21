@@ -89,17 +89,17 @@ The exact infrastructure/app publication commands are supplied and owned by `fam
 9. Observe API error count, latency, authorization denials, and structured logs long enough to catch immediate release failures. Inspect only privacy-safe fields.
 10. Record deployed and prior identifiers and close the release only after success evidence is complete.
 
-## Foundation smoke test
+## Household-bootstrap smoke test
 
-The human release owner performs this non-destructive browser flow with the verification-only account:
+After separately approving creation of synthetic production bootstrap data, the human release owner performs this browser flow:
 
 1. Open the canonical production URL in a clean browser context and verify the PWA shell loads.
 2. Confirm keyboard focus, labels, and responsive layout at one target viewport.
-3. Sign in through the temporary username/password form without recording the credentials.
-4. Confirm the live protected endpoint response presents exactly `sub`, `username`, and `expiresAt` and no household/profile data.
-5. Sign out and confirm private state is cleared.
-6. Confirm a protected request without authentication is rejected with no session data.
-7. Confirm logs contain request ID, route, status/outcome, and no token, credentials, username, `sub`, or family content.
+3. Confirm invalid and closed registration fail safely, then use the approved gate to register the synthetic first parent without recording credentials or gate values.
+4. Confirm the email code, sign in, create one synthetic household, and verify the onboarding name/add-members next step.
+5. Reload the current tab to verify restoration, then sign out and confirm session/private rendered state is cleared.
+6. Exercise Forgot Password through the verified synthetic email and confirm a protected request without authentication is rejected.
+7. Confirm logs contain request ID, route, status/outcome, and no token, credentials, gate, email, username, `sub`, household name, or raw body.
 
 Later releases replace this probe with the smallest non-destructive critical flow for delivered capabilities. Do not create, edit, or delete real family data merely to smoke-test when synthetic/reversible verification is available.
 

@@ -16,12 +16,58 @@ data "terraform_remote_state" "shared" {
   }
 }
 
+resource "aws_cognito_user_pool" "todone" {
+  name                     = "${local.app_name}-users-${local.environment}"
+  auto_verified_attributes = ["email"]
+  deletion_protection      = "ACTIVE"
+
+  username_configuration {
+    case_sensitive = false
+  }
+
+  password_policy {
+    minimum_length    = 8
+    require_lowercase = true
+    require_uppercase = true
+    require_numbers   = true
+    require_symbols   = true
+  }
+
+  schema {
+    name                = "email"
+    attribute_data_type = "String"
+    required            = false
+    mutable             = true
+  }
+
+  admin_create_user_config {
+    allow_admin_create_user_only = false
+  }
+
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "verified_email"
+      priority = 1
+    }
+  }
+
+  lambda_config {
+    pre_sign_up = module.pre_signup_lambda.function_arn
+  }
+
+  tags = {
+    Name        = "Todone users"
+    Environment = local.environment
+    ManagedBy   = "terraform"
+  }
+}
+
 module "auth" {
   source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/cognito-app-client?ref=eeac7ad"
 
   app_name     = local.app_name
   environment  = local.environment
-  user_pool_id = data.terraform_remote_state.shared.outputs.cognito_user_pool_id
+  user_pool_id = aws_cognito_user_pool.todone.id
 }
 
 module "table" {
@@ -64,6 +110,48 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role" "pre_signup_role" {
+  name = "${local.app_name}-pre-signup-${local.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "pre_signup_basic" {
+  role       = aws_iam_role.pre_signup_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+module "pre_signup_lambda" {
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=eeac7ad"
+
+  function_name    = "pre-signup"
+  app_name         = local.app_name
+  environment      = local.environment
+  lambda_role_arn  = aws_iam_role.pre_signup_role.arn
+  s3_bucket        = data.terraform_remote_state.shared.outputs.lambda_deployments_bucket
+  s3_key           = var.lambda_artifacts["pre-signup"].s3_key
+  source_code_hash = var.lambda_artifacts["pre-signup"].source_code_hash
+
+  environment_variables = {
+    REGISTRATION_GATE_PASSWORD_HASH = var.registration_gate_password_hash
+  }
+}
+
+resource "aws_lambda_permission" "cognito_pre_signup" {
+  statement_id  = "AllowCognitoPreSignup"
+  action        = "lambda:InvokeFunction"
+  function_name = module.pre_signup_lambda.function_name
+  principal     = "cognito-idp.amazonaws.com"
+  source_arn    = aws_cognito_user_pool.todone.arn
+}
+
 resource "aws_iam_role_policy" "lambda_table_access" {
   name = "${local.app_name}-table-access-${local.environment}"
   role = aws_iam_role.lambda_role.id
@@ -96,7 +184,9 @@ module "lambdas" {
   source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=eeac7ad"
 
   for_each = {
-    session = { s3_key = var.session_lambda_s3_key }
+    session            = var.lambda_artifacts["session"]
+    current-membership = var.lambda_artifacts["current-membership"]
+    create-household   = var.lambda_artifacts["create-household"]
   }
 
   function_name    = each.key
@@ -105,11 +195,11 @@ module "lambdas" {
   lambda_role_arn  = aws_iam_role.lambda_role.arn
   s3_bucket        = data.terraform_remote_state.shared.outputs.lambda_deployments_bucket
   s3_key           = each.value.s3_key
-  source_code_hash = var.session_lambda_source_code_hash
+  source_code_hash = each.value.source_code_hash
 
   environment_variables = {
     TODONE_TABLE_NAME    = module.table.table_name
-    COGNITO_USER_POOL_ID = data.terraform_remote_state.shared.outputs.cognito_user_pool_id
+    COGNITO_USER_POOL_ID = aws_cognito_user_pool.todone.id
     COGNITO_CLIENT_ID    = module.auth.client_id
   }
 }
@@ -125,7 +215,7 @@ module "api" {
   cors_allowed_origins = var.allowed_origins
 
   auth = {
-    issuer   = data.terraform_remote_state.shared.outputs.cognito_user_pool_issuer
+    issuer   = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.todone.id}"
     audience = [module.auth.client_id]
   }
 
@@ -134,6 +224,18 @@ module "api" {
       route_key     = "GET /api/v1/session"
       function_arn  = module.lambdas["session"].invoke_arn
       function_name = module.lambdas["session"].function_name
+      auth_required = true
+    },
+    {
+      route_key     = "GET /api/v1/memberships/current"
+      function_arn  = module.lambdas["current-membership"].invoke_arn
+      function_name = module.lambdas["current-membership"].function_name
+      auth_required = true
+    },
+    {
+      route_key     = "POST /api/v1/households"
+      function_arn  = module.lambdas["create-household"].invoke_arn
+      function_name = module.lambdas["create-household"].function_name
       auth_required = true
     },
   ]

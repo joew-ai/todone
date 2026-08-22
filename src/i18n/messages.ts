@@ -51,9 +51,6 @@ export interface BootstrapMessages {
   createHouseholdAction: string;
   signOut: string;
   ready: string;
-  onboardingHelp: string;
-  addFamilyMembers: string;
-  membersComingSoon: string;
 }
 
 interface EnglishMessages {
@@ -81,7 +78,6 @@ interface EnglishMessages {
     loadFailed: string;
     retry: string;
   };
-  householdRepository: { missingProfile: string };
   familyClient: { sessionEnded: string; requestFailed: string };
   familyManagement: {
     heading: string;

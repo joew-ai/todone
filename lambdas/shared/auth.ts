@@ -4,6 +4,7 @@ import { createCognitoVerifier, type TokenVerifier } from '../session/verifier';
 export interface AuthenticatedIdentity {
   sub: string;
   username: string;
+  issuedAt?: number;
 }
 
 let cachedVerifier: TokenVerifier | null = null;
@@ -31,7 +32,7 @@ export async function authenticateRequest(
   try {
     const verifier = verifierOverride ?? getVerifier();
     const claims = await verifier.verify(token);
-    return { sub: claims.sub, username: claims.username };
+    return { sub: claims.sub, username: claims.username, issuedAt: claims.iat };
   } catch {
     return null;
   }
@@ -48,9 +49,19 @@ function gatewayAuthorizerIdentity(
   if (!isRecord(claims)) return { kind: 'invalid' };
   const sub = claims[CognitoClaim.subject];
   const username = claims[CognitoClaim.username] ?? claims.username;
+  const issuedAt = epochSeconds(claims.iat);
   return typeof sub === 'string' && typeof username === 'string'
-    ? { kind: 'valid', identity: { sub, username } }
+    ? { kind: 'valid', identity: { sub, username, issuedAt } }
     : { kind: 'invalid' };
+}
+
+function epochSeconds(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return value;
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    const seconds = Number(value);
+    return Number.isSafeInteger(seconds) ? seconds : undefined;
+  }
+  return undefined;
 }
 
 function bearerToken(headers: Record<string, string | undefined>): string | null {

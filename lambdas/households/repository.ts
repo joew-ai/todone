@@ -39,7 +39,6 @@ import type {
   SaveProfileInput,
   SaveProfileResult,
 } from './model';
-import { messages } from '../../src/i18n/messages';
 
 interface StoredMembership extends CurrentMembership {
   sub: string;
@@ -53,12 +52,16 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
     private readonly id = randomUUID,
   ) {}
 
-  async getCurrentMembership(sub: string): Promise<CurrentMembership | null> {
+  async getCurrentMembership(
+    sub: string,
+    tokenIssuedAt?: number,
+  ): Promise<CurrentMembership | null> {
     const lookup = await this.getItem(membershipLookupKey(sub));
     if (!lookup) return null;
     if (requiredActivationState(lookup.activationState) !== MembershipActivationState.active) {
       return null;
     }
+    if (!isTokenCurrent(lookup.credentialsValidAfter, tokenIssuedAt)) return null;
     const householdId = requiredStringAttribute(lookup.householdId);
     const memberId = requiredStringAttribute(lookup.memberId);
     const [household, membership] = await Promise.all([
@@ -172,7 +175,7 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
       memberships.map(async (membership) => {
         const memberId = requiredStringAttribute(membership.memberId);
         const profile = await this.getProfile(householdId, memberId);
-        if (!profile) throw new Error(messages.householdRepository.missingProfile);
+        if (!profile) throw missingProfileError();
         return directoryMemberFromStoredItem(membership, profile);
       }),
     );
@@ -209,7 +212,10 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
   private readonly profiles = new Map<string, Profile>();
   constructor(private readonly id = randomUUID) {}
 
-  async getCurrentMembership(sub: string): Promise<CurrentMembership | null> {
+  async getCurrentMembership(
+    sub: string,
+    _tokenIssuedAt?: number,
+  ): Promise<CurrentMembership | null> {
     const stored = this.memberships.get(sub);
     if (!stored) return null;
     const { sub: ignoredSub, ...membership } = stored;
@@ -272,7 +278,7 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
     const directory = members.map((membership) => {
       const profile =
         this.profiles.get(profileStorageKey(householdId, membership.memberId)) ?? null;
-      if (!profile) throw new Error(messages.householdRepository.missingProfile);
+      if (!profile) throw missingProfileError();
       return {
         memberId: membership.memberId,
         username: membership.username,
@@ -530,8 +536,18 @@ function isExpectedProfileVersion(existing: Profile | null, requestedVersion: nu
   // Exact comparison prevents both stale retries and skipped/out-of-order writes.
   return existing ? existing.version === requestedVersion : requestedVersion === 0;
 }
+export function isTokenCurrent(value: AttributeValue | undefined, issuedAt?: number): boolean {
+  if (!value) return true;
+  if (issuedAt === undefined) return false;
+  const cutoff = Date.parse(requiredStringAttribute(value));
+  if (Number.isNaN(cutoff)) throw new Error('Stored credential cutoff is invalid.');
+  return issuedAt * 1000 > cutoff;
+}
 function cloneProfile(profile: Profile | null): Profile | null {
   return profile ? structuredClone(profile) : null;
+}
+function missingProfileError(): Error {
+  return new Error('Stored active household member is missing a profile.');
 }
 function hashInput(name: string, timezone: string, username: string): string {
   return createHash('sha256').update(JSON.stringify({ name, timezone, username })).digest('hex');

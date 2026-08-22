@@ -79,7 +79,7 @@ export type BootstrapResult =
   | { kind: 'idempotency-conflict' };
 
 export interface HouseholdRepository {
-  getCurrentMembership(sub: string): Promise<CurrentMembership | null>;
+  getCurrentMembership(sub: string, tokenIssuedAt?: number): Promise<CurrentMembership | null>;
   bootstrap(input: BootstrapInput): Promise<BootstrapResult>;
   getProfile(householdId: string, memberId: string): Promise<Profile | null>;
   saveProfile(input: SaveProfileInput): Promise<SaveProfileResult>;

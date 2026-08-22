@@ -3,6 +3,8 @@ import { CognitoJwtVerifier, JwtVerifier } from 'aws-jwt-verify';
 export interface SessionClaims {
   sub: string;
   username: string;
+  /** Issued-at time as seconds since epoch, matching the JWT `iat` claim. */
+  iat?: number;
   /** Expiration as seconds since epoch, matching the JWT `exp` claim. */
   exp: number;
 }
@@ -24,7 +26,7 @@ interface CognitoVerifierConfig {
 }
 
 function toSessionClaims(payload: Record<string, unknown>): SessionClaims {
-  const { sub, exp } = payload;
+  const { sub, exp, iat } = payload;
   const username = payload['cognito:username'] ?? payload['username'];
 
   if (typeof username !== 'string') {
@@ -34,7 +36,10 @@ function toSessionClaims(payload: Record<string, unknown>): SessionClaims {
     throw new Error('Verified token is missing a required claim.');
   }
 
-  return { sub, username, exp };
+  if (iat !== undefined && typeof iat !== 'number') {
+    throw new Error('Verified token has an invalid issued-at claim.');
+  }
+  return { sub, username, ...(iat === undefined ? {} : { iat }), exp };
 }
 
 /**

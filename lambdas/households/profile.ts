@@ -34,7 +34,7 @@ export async function readHandler(
     if (!identity) return unauthorizedResponse(requestId);
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub);
+    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
     if (!membership) return unauthorizedResponse(requestId);
     const profile = await repository.getProfile(
       membership.household.householdId,
@@ -66,7 +66,7 @@ export async function updateHandler(
     }
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub);
+    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
     if (!membership) return unauthorizedResponse(requestId);
     const result = await repository.saveProfile({
       householdId: membership.household.householdId,

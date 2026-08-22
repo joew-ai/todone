@@ -29,7 +29,7 @@ export async function handler(
     if (!identity) return unauthorizedResponse(requestId);
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub);
+    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
     if (!membership) return unauthorizedResponse(requestId);
     const members = await repository.listFamilyMembers(membership.household.householdId);
     return json(HttpStatus.ok, { members: directoryForCaller(membership, members) });

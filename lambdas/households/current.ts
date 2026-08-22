@@ -22,7 +22,7 @@ export async function handler(
     if (!identity) return unauthorizedResponse(requestId);
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub);
+    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
     return json(200, { membership });
   });
 }

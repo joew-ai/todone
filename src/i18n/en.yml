@@ -55,9 +55,6 @@
       'createHouseholdAction': 'Create household',
       'signOut': 'Sign out',
       'ready': 'Household ready',
-      'onboardingHelp': 'Next, add your family members. After that, you’ll be ready to create Todos.',
-      'addFamilyMembers': 'Add family members',
-      'membersComingSoon': 'Family accounts arrive in the next crawl step.',
     },
   'householdClient':
     {
@@ -91,8 +88,6 @@
       'loadFailed': 'We could not load your profile.',
       'retry': 'Try again',
     },
-  'householdRepository':
-    { 'missingProfile': 'Stored active household member is missing a profile.' },
   'familyClient':
     {
       'sessionEnded': 'Your session ended. Sign in to continue.',

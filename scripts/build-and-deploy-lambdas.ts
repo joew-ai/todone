@@ -18,7 +18,15 @@
  */
 import { execFileSync, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import * as esbuild from 'esbuild';
 
@@ -30,6 +38,7 @@ const DEPLOYABLE_LAMBDAS = {
   'current-membership': 'lambdas/households/current.ts',
   'create-household': 'lambdas/households/create.ts',
   profile: 'lambdas/households/profile.ts',
+  'family-directory': 'lambdas/households/directory.ts',
   'pre-signup': 'lambdas/pre-signup/index.ts',
 } as const;
 
@@ -43,6 +52,9 @@ const ENVIRONMENT = 'prod';
 const DEPLOYMENTS_BUCKET = 'lambda-deployments-743837809639';
 
 const BUILD_DIR = join(process.cwd(), '.lambda-build');
+// ZIP's DOS timestamp format starts in 1980. Give every entry the same valid
+// timestamp so an unchanged Lambda source produces the same release hash.
+const REPRODUCIBLE_ZIP_TIME = new Date('1980-01-01T00:00:00.000Z');
 
 interface BuildResult {
   name: string;
@@ -85,9 +97,12 @@ async function buildLambda(name: string): Promise<BuildResult> {
   // Force CommonJS unambiguously inside the artifact, regardless of this
   // repo's own root `package.json` ("type": "module") or whatever the
   // Lambda runtime's default resolution would otherwise infer.
-  writeFileSync(join(outDir, 'package.json'), JSON.stringify({ type: 'commonjs' }) + '\n');
+  const packagePath = join(outDir, 'package.json');
+  writeFileSync(packagePath, JSON.stringify({ type: 'commonjs' }) + '\n');
   // `zip` (not a new dependency) keeps the artifact reproducible without
   // adding an archiving library for one build step.
+  utimesSync(outfile, REPRODUCIBLE_ZIP_TIME, REPRODUCIBLE_ZIP_TIME);
+  utimesSync(packagePath, REPRODUCIBLE_ZIP_TIME, REPRODUCIBLE_ZIP_TIME);
   execFileSync('zip', ['-qX', zipPath, 'index.js', 'package.json'], { cwd: outDir });
 
   const bytes = readFileSync(zipPath);

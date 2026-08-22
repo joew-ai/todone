@@ -1,5 +1,38 @@
 import type { ApiResult } from './apiResult';
 
+export const HttpHeader = {
+  accept: 'accept',
+  authorization: 'authorization',
+  contentType: 'content-type',
+} as const;
+export const APPLICATION_JSON = 'application/json';
+export const HttpMethod = { get: 'GET', post: 'POST', put: 'PUT' } as const;
+const NO_STORE = 'no-store';
+
+export interface AuthenticatedJsonResponse<T> {
+  response: Response;
+  body: T | null;
+}
+
+/** Applies the application's non-cacheable bearer-token JSON request contract. */
+export async function fetchAuthenticatedJson<T>(
+  url: string,
+  idToken: string,
+  init: RequestInit,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AuthenticatedJsonResponse<T>> {
+  const response = await fetchImpl(url, {
+    ...init,
+    headers: {
+      [HttpHeader.accept]: APPLICATION_JSON,
+      [HttpHeader.authorization]: `Bearer ${idToken}`,
+      ...init.headers,
+    },
+    cache: NO_STORE,
+  });
+  return { response, body: (await response.json().catch(() => null)) as T | null };
+}
+
 export interface HealthResponse {
   status: 'ok';
   timestamp: string;
@@ -16,8 +49,8 @@ export async function fetchHealth(
 ): Promise<ApiResult<HealthResponse>> {
   try {
     const response = await fetchImpl('/api/v1/health', {
-      method: 'GET',
-      headers: { accept: 'application/json' },
+      method: HttpMethod.get,
+      headers: { [HttpHeader.accept]: APPLICATION_JSON },
     });
 
     if (!response.ok) {

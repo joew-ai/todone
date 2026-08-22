@@ -28,6 +28,8 @@
 - Keep user-visible frontend copy in src/i18n/en.yml; API messages must be generic domain messages, not instructions tied to a particular UI.
 - Prefer explicit control flow over conditional return expressions when the condition carries authorization or state meaning.
 - Keep user-visible strings and stable external error identifiers in centralized catalogs or named constants.
+- Put every human-readable message, including invariant and internal-failure messages, in `src/i18n/en.yml`; do not introduce inline prose strings in application or Lambda code.
+- Reuse shared HTTP status/response and authenticated-request helpers rather than defining endpoint-specific response plumbing.
 - When a constant serves one small code region, define it as near to that region as practical without recreating it repeatedly.
 - Reuse shared request, response, repository, and validation utilities when they preserve an established contract. Record request IDs and outcomes for successful as well as failed API requests.
 - Prefer descriptive helper names over terse persistence or serialization abbreviations.

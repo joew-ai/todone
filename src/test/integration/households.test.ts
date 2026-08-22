@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as createHousehold } from '../../../lambdas/households/create';
 import { handler as currentMembership } from '../../../lambdas/households/current';
+import { handler as familyDirectory } from '../../../lambdas/households/directory';
 import { isResourceInHousehold } from '../../../lambdas/households/authorization';
 import { InMemoryHouseholdRepository } from '../../../lambdas/households/repository';
 
@@ -177,5 +178,41 @@ describe('household bootstrap API and persistence', () => {
       version: 3,
     });
     expect(skipped).toMatchObject({ kind: 'conflict', profile: { version: 2 } });
+  });
+
+  it('returns only safe, deterministic family-directory fields for the caller household', async () => {
+    const repository = new InMemoryHouseholdRepository(() => 'generated-id');
+    await repository.bootstrap({
+      sub: 'sub-one',
+      username: 'parent-one',
+      idempotencyKey: 'one',
+      name: 'River House',
+      timezone: 'America/Chicago',
+    });
+    const membership = await repository.getCurrentMembership('sub-one');
+    if (!membership) throw new Error('Expected membership.');
+    await repository.saveProfile({
+      householdId: membership.household.householdId,
+      memberId: membership.memberId,
+      displayName: 'Parent One',
+      color: 'PINE',
+      version: 0,
+    });
+
+    const response = await familyDirectory(event('GET'), { repository });
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body ?? '{}')).toEqual({
+      members: [
+        {
+          memberId: 'generated-id',
+          username: 'parent-one',
+          role: 'parent',
+          activationState: 'ACTIVE',
+          displayName: 'Parent One',
+          color: 'PINE',
+        },
+      ],
+    });
+    expect(response.body).not.toContain('sub-one');
   });
 });

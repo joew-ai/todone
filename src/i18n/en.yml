@@ -72,4 +72,25 @@
       'invalidVersion': 'The profile version is invalid.',
       'conflict': 'This profile changed elsewhere. Review the latest version and try again.',
     },
+  'profileClient':
+    {
+      'sessionEnded': 'Your session ended. Sign in to continue.',
+      'requestFailed': 'We could not save your profile. Nothing changed. Try again.',
+    },
+  'profileSetup':
+    {
+      'heading': 'Set up your profile',
+      'help': 'Choose the name and color your family will see.',
+      'displayName': 'Display name',
+      'color': 'Profile color',
+      'colorRequired': 'Choose a profile color.',
+      'displayNameRequired': 'Enter a display name.',
+      'saving': 'Saving profile…',
+      'save': 'Continue to family management',
+      'saved': 'Profile saved. Your household is ready.',
+      'loadFailed': 'We could not load your profile.',
+      'retry': 'Try again',
+    },
+  'householdRepository':
+    { 'missingProfile': 'Stored active household member is missing a profile.' },
 }

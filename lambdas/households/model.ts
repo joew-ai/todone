@@ -37,6 +37,16 @@ export interface Profile {
   version: number;
 }
 
+/** Safe family-directory representation; recovery contact and Cognito fields never belong here. */
+export interface FamilyDirectoryMember {
+  memberId: string;
+  username: string;
+  role: MembershipRole;
+  activationState: MembershipActivationState;
+  displayName: string;
+  color: ProfileColorId;
+}
+
 export interface SaveProfileInput {
   householdId: string;
   memberId: string;
@@ -66,4 +76,5 @@ export interface HouseholdRepository {
   bootstrap(input: BootstrapInput): Promise<BootstrapResult>;
   getProfile(householdId: string, memberId: string): Promise<Profile | null>;
   saveProfile(input: SaveProfileInput): Promise<SaveProfileResult>;
+  listFamilyMembers(householdId: string): Promise<FamilyDirectoryMember[]>;
 }

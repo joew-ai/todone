@@ -3,6 +3,7 @@ import { authenticateRequest } from '../shared/auth';
 import { handleObservedRequest } from '../shared/request';
 import {
   errorResponse,
+  HttpStatus,
   invalidJsonResponse,
   json,
   unauthorizedResponse,
@@ -16,7 +17,6 @@ import { getHouseholdRepository } from './runtime';
 import { messages } from '../../src/i18n/messages';
 
 const PROFILE_ROUTE = '/api/v1/profiles/me';
-const HttpStatus = { ok: 200, created: 201, conflict: 409 } as const;
 
 export interface ProfileHandlerDependencies {
   repository: HouseholdRepository;

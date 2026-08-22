@@ -14,6 +14,15 @@ export const ApiErrorCode = {
   validationFailed: 'VALIDATION_FAILED',
 } as const;
 
+export const HttpStatus = {
+  ok: 200,
+  created: 201,
+  badRequest: 400,
+  unauthorized: 401,
+  conflict: 409,
+  unprocessableContent: 422,
+} as const;
+
 export function json(statusCode: number, value: unknown): APIGatewayProxyStructuredResultV2 {
   return { statusCode, headers: JSON_NO_STORE_HEADERS, body: JSON.stringify(value) };
 }
@@ -31,7 +40,12 @@ export function errorResponse(
 }
 
 export function unauthorizedResponse(requestId: string): APIGatewayProxyStructuredResultV2 {
-  return errorResponse(401, ApiErrorCode.unauthorized, 'Authentication is required.', requestId);
+  return errorResponse(
+    HttpStatus.unauthorized,
+    ApiErrorCode.unauthorized,
+    'Authentication is required.',
+    requestId,
+  );
 }
 
 export function invalidJsonResponse(requestId: string): APIGatewayProxyStructuredResultV2 {

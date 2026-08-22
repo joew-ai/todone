@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   DynamoDBClient,
   GetItemCommand,
+  QueryCommand,
   PutItemCommand,
   TransactWriteItemsCommand,
   ConditionalCheckFailedException,
@@ -10,6 +11,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import {
   ATTRIBUTE_DOES_NOT_EXIST,
+  HouseholdRecord,
   HouseholdRole,
   INITIAL_HOUSEHOLD_VERSION,
   INITIAL_PROFILE_VERSION,
@@ -29,6 +31,7 @@ import type {
   BootstrapInput,
   BootstrapResult,
   CurrentMembership,
+  FamilyDirectoryMember,
   HouseholdRepository,
   MembershipActivationState as MembershipActivationStateValue,
   MembershipRole,
@@ -36,6 +39,7 @@ import type {
   SaveProfileInput,
   SaveProfileResult,
 } from './model';
+import { messages } from '../../src/i18n/messages';
 
 interface StoredMembership extends CurrentMembership {
   sub: string;
@@ -150,6 +154,31 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
     }
   }
 
+  async listFamilyMembers(householdId: string): Promise<FamilyDirectoryMember[]> {
+    const key = householdKey(householdId);
+    const result = await this.client.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        KeyConditionExpression: 'pk = :pk AND begins_with(sk, :memberPrefix)',
+        ExpressionAttributeValues: {
+          ':pk': stringAttribute(key.pk),
+          ':memberPrefix': stringAttribute(`${HouseholdRecord.memberPrefix}#`),
+        },
+        ConsistentRead: true,
+      }),
+    );
+    const memberships = result.Items ?? [];
+    const members = await Promise.all(
+      memberships.map(async (membership) => {
+        const memberId = requiredStringAttribute(membership.memberId);
+        const profile = await this.getProfile(householdId, memberId);
+        if (!profile) throw new Error(messages.householdRepository.missingProfile);
+        return directoryMemberFromStoredItem(membership, profile);
+      }),
+    );
+    return sortDirectoryMembers(members);
+  }
+
   private async readReplay(
     sub: string,
     idempotencyKey: string,
@@ -230,6 +259,30 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
     };
     this.profiles.set(key, structuredClone(profile));
     return { kind: existing ? 'updated' : 'created', profile };
+  }
+
+  async listFamilyMembers(householdId: string): Promise<FamilyDirectoryMember[]> {
+    // Memberships are indexed by Cognito `sub` across every in-memory household.
+    const members = [...this.memberships.values()]
+      .filter((membership) => membership.household.householdId === householdId)
+      .map(({ sub: ignoredSub, ...membership }) => {
+        void ignoredSub;
+        return membership;
+      });
+    const directory = members.map((membership) => {
+      const profile =
+        this.profiles.get(profileStorageKey(householdId, membership.memberId)) ?? null;
+      if (!profile) throw new Error(messages.householdRepository.missingProfile);
+      return {
+        memberId: membership.memberId,
+        username: membership.username,
+        role: membership.role,
+        activationState: MembershipActivationState.active,
+        displayName: profile.displayName,
+        color: profile.color,
+      };
+    });
+    return sortDirectoryMembers(directory);
   }
 }
 
@@ -377,6 +430,34 @@ function profileFromItem(item: Record<string, AttributeValue>): Profile {
     color: requiredProfileColor(item.color),
     version: requiredNumberAttribute(item.version),
   };
+}
+
+function directoryMemberFromStoredItem(
+  membership: Record<string, AttributeValue>,
+  profile: Profile,
+): FamilyDirectoryMember {
+  return {
+    memberId: requiredStringAttribute(membership.memberId),
+    username: requiredStringAttribute(membership.username),
+    role: requiredMembershipRole(membership.role),
+    activationState: requiredActivationState(membership.activationState),
+    displayName: profile.displayName,
+    color: profile.color,
+  };
+}
+
+function sortDirectoryMembers(members: FamilyDirectoryMember[]): FamilyDirectoryMember[] {
+  const activationOrder: Record<MembershipActivationStateValue, number> = {
+    [MembershipActivationState.active]: 0,
+    [MembershipActivationState.pendingActivation]: 1,
+    [MembershipActivationState.inactive]: 2,
+  };
+  return members.sort(
+    (left, right) =>
+      activationOrder[left.activationState] - activationOrder[right.activationState] ||
+      left.username.localeCompare(right.username) ||
+      left.memberId.localeCompare(right.memberId),
+  );
 }
 
 function putItem(

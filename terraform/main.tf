@@ -188,6 +188,7 @@ module "lambdas" {
     current-membership = var.lambda_artifacts["current-membership"]
     create-household   = var.lambda_artifacts["create-household"]
     profile            = var.lambda_artifacts["profile"]
+    family-directory   = var.lambda_artifacts["family-directory"]
   }
 
   function_name    = each.key
@@ -249,6 +250,12 @@ module "api" {
       route_key     = "PUT /api/v1/profiles/me"
       function_arn  = module.lambdas["profile"].invoke_arn
       function_name = module.lambdas["profile"].function_name
+      auth_required = true
+    },
+    {
+      route_key     = "GET /api/v1/family-members"
+      function_arn  = module.lambdas["family-directory"].invoke_arn
+      function_name = module.lambdas["family-directory"].function_name
       auth_required = true
     },
   ]

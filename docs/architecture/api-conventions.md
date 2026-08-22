@@ -53,6 +53,7 @@ An active member receives exactly:
 {
   "membership": {
     "memberId": "opaque-member-id",
+    "username": "river-parent",
     "role": "parent",
     "household": {
       "householdId": "opaque-household-id",
@@ -80,6 +81,19 @@ Content-Type: application/json
 The name is trimmed, must contain 1–80 Unicode characters, and must not contain control characters. The timezone must be an IANA name recognized by the server runtime. Unknown properties are rejected. Success returns `201 Created` with the same non-null `membership` representation as `GET /api/v1/memberships/current`. Reusing the same idempotency key with the same normalized input returns the original successful representation; reusing it with different input returns `409 Conflict`. An existing member's create attempt returns `409 Conflict`, invalid fields return `422 Unprocessable Content`, and missing or invalid authentication returns `401 Unauthorized`.
 
 Neither bootstrap request accepts a household ID, member ID, role, username, email, or Cognito `sub` from the client. Household and membership identifiers are generated server-side, the caller comes from verified authorizer claims, and the initial role is always `parent`.
+
+## Profile and family-directory contracts
+
+An active member reads and version-writes only their own profile through `GET` and `PUT /api/v1/profiles/me`. The write body accepts exactly `displayName`, canonical `color`, and `version`; it never accepts a household ID, member ID, role, username, or Cognito `sub`. A missing profile reads as `{"profile": null}` so first-parent setup can create version `0`; a successful create returns `201 Created` and subsequent writes return `200 OK`. A stale or skipped version returns `409 Conflict` without overwriting the saved profile.
+
+Any active household member may read the safe family directory through:
+
+```http
+GET /api/v1/family-members
+Authorization: Bearer <Cognito-ID-token>
+```
+
+The caller's verified `sub` resolves the household; the request accepts no target or household identifier. The response contains only `memberId`, immutable `username`, immutable `role`, activation state, and current `displayName`/canonical `color`. It is deterministically ordered by activation state, username, then member ID. Recovery email, Cognito status/details, raw `sub`, household details, and cross-household records are never represented.
 
 ## Authentication and authorization
 

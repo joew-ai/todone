@@ -9,6 +9,13 @@ import {
   fetchCurrentMembership,
   type CurrentMembership,
 } from '../services/householdClient';
+import {
+  fetchMyProfile,
+  ProfileColor,
+  ProfileColorHex,
+  saveMyProfile,
+  type ProfileColorId,
+} from '../services/profileClient';
 
 type Screen =
   | 'restoring'
@@ -19,6 +26,9 @@ type Screen =
   | 'reset'
   | 'membership-loading'
   | 'household'
+  | 'profile-loading'
+  | 'profile-load-error'
+  | 'profile-setup'
   | 'onboarding';
 
 const supportedTimezones = [
@@ -32,6 +42,12 @@ const supportedTimezones = [
   'Australia/Sydney',
 ];
 const copy = messages.bootstrap;
+const profileCopy = messages.profileSetup;
+const profileColors = Object.values(ProfileColor).map((color) => ({
+  id: color,
+  hex: ProfileColorHex[color],
+  label: color.charAt(0) + color.slice(1).toLowerCase(),
+}));
 
 const screen = ref<Screen>('restoring');
 const busy = ref(false);
@@ -46,6 +62,8 @@ const newPassword = ref('');
 const householdName = ref('');
 const timezone = ref(browserTimezone());
 const membership = ref<CurrentMembership | null>(null);
+const displayName = ref('');
+const profileColor = ref<ProfileColorId | ''>('');
 const fieldError = ref<Record<string, string>>({});
 const firstField = ref<{ focus(): void } | null>(null);
 const registrationPasswordField = ref<{ focus(): void } | null>(null);
@@ -158,7 +176,27 @@ async function resolveMembership(idToken: string): Promise<void> {
     return;
   }
   membership.value = result.data.membership;
-  screen.value = membership.value ? 'onboarding' : 'household';
+  if (!membership.value) {
+    screen.value = 'household';
+    return;
+  }
+  await resolveProfile(idToken);
+}
+
+async function resolveProfile(idToken: string): Promise<void> {
+  screen.value = 'profile-loading';
+  const result = await fetchMyProfile(idToken);
+  if (result.kind === 'error') {
+    if (!result.recoverable) {
+      signOut(result.message);
+      return;
+    }
+    status.value = profileCopy.loadFailed;
+    statusIsError.value = true;
+    screen.value = 'profile-load-error';
+    return;
+  }
+  screen.value = result.data.profile ? 'onboarding' : 'profile-setup';
 }
 
 async function submitHousehold(): Promise<void> {
@@ -189,10 +227,48 @@ async function submitHousehold(): Promise<void> {
       return;
     }
     membership.value = result.data.membership;
-    screen.value = 'onboarding';
     status.value = copy.created;
     statusIsError.value = false;
+    await resolveProfile(token);
   });
+}
+
+async function submitProfile(): Promise<void> {
+  fieldError.value = {};
+  const trimmedDisplayName = displayName.value.trim();
+  if (!trimmedDisplayName) fieldError.value.displayName = profileCopy.displayNameRequired;
+  if (!profileColor.value) fieldError.value.color = profileCopy.colorRequired;
+  if (Object.keys(fieldError.value).length) {
+    status.value = messages.profileApi.invalidDisplayName;
+    statusIsError.value = true;
+    await focusFirstField();
+    return;
+  }
+  await run(async () => {
+    const token = client().getIdToken();
+    if (!token) return signOut(copy.sessionEnded);
+    const result = await saveMyProfile(token, {
+      displayName: trimmedDisplayName,
+      color: profileColor.value as ProfileColorId,
+      version: 0,
+    });
+    if (result.kind === 'error') {
+      for (const error of result.fieldErrors ?? []) fieldError.value[error.field] = error.message;
+      status.value = result.message;
+      statusIsError.value = true;
+      if (!result.recoverable) signOut(result.message);
+      return;
+    }
+    status.value = profileCopy.saved;
+    statusIsError.value = false;
+    screen.value = 'onboarding';
+  });
+}
+
+async function retryProfile(): Promise<void> {
+  const token = client().getIdToken();
+  if (!token) return signOut(copy.sessionEnded);
+  await resolveProfile(token);
 }
 
 function signOut(message = copy.signedOut): void {
@@ -212,6 +288,8 @@ function clearPrivateState(message: string): void {
   code.value = '';
   newPassword.value = '';
   householdName.value = '';
+  displayName.value = '';
+  profileColor.value = '';
   username.value = '';
   email.value = '';
   fieldError.value = {};
@@ -296,7 +374,12 @@ async function focusFirstField(): Promise<void> {
       </p>
     </div>
 
-    <div v-if="screen === 'restoring' || screen === 'membership-loading'" aria-busy="true">
+    <div
+      v-if="
+        screen === 'restoring' || screen === 'membership-loading' || screen === 'profile-loading'
+      "
+      aria-busy="true"
+    >
       <h2 class="text-xl font-semibold text-leaf-900">{{ copy.restoreHeading }}</h2>
       <p class="mt-2 text-stone-600">{{ copy.restoring }}</p>
     </div>
@@ -483,6 +566,66 @@ async function focusFirstField(): Promise<void> {
       <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>
     </form>
 
+    <div v-else-if="screen === 'profile-load-error'" class="space-y-4">
+      <h2 class="text-xl font-semibold text-leaf-900">{{ profileCopy.heading }}</h2>
+      <p class="text-stone-700">{{ profileCopy.loadFailed }}</p>
+      <button type="button" class="primary" @click="retryProfile">{{ profileCopy.retry }}</button>
+      <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>
+    </div>
+
+    <form v-else-if="screen === 'profile-setup'" class="space-y-5" @submit.prevent="submitProfile">
+      <h2 class="text-xl font-semibold text-leaf-900">{{ profileCopy.heading }}</h2>
+      <p class="text-sm text-stone-600">{{ profileCopy.help }}</p>
+      <label class="block"
+        >{{ profileCopy.displayName
+        }}<input
+          ref="firstField"
+          v-model="displayName"
+          required
+          maxlength="60"
+          autocomplete="nickname"
+          class="field"
+          :disabled="busy"
+          :aria-invalid="!!fieldError.displayName"
+          aria-describedby="profile-display-name-error"
+        /><span id="profile-display-name-error" class="error">{{
+          fieldError.displayName
+        }}</span></label
+      >
+      <fieldset :aria-describedby="fieldError.color ? 'profile-color-error' : undefined">
+        <legend class="font-medium text-stone-950">{{ profileCopy.color }}</legend>
+        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label
+            v-for="color in profileColors"
+            :key="color.id"
+            class="profile-color-option"
+            :class="{ 'profile-color-option--selected': profileColor === color.id }"
+          >
+            <input
+              v-model="profileColor"
+              type="radio"
+              name="profile-color"
+              :value="color.id"
+              :disabled="busy"
+            />
+            <span
+              class="profile-color-swatch"
+              :style="{ backgroundColor: color.hex }"
+              aria-hidden="true"
+            />
+            <span>{{ color.label }}</span>
+          </label>
+        </div>
+        <span id="profile-color-error" class="error">{{ fieldError.color }}</span>
+      </fieldset>
+      <button class="primary" type="submit" :disabled="busy">
+        {{ busy ? profileCopy.saving : profileCopy.save }}
+      </button>
+      <button type="button" class="link" :disabled="busy" @click="signOut()">
+        {{ copy.signOut }}
+      </button>
+    </form>
+
     <div v-else-if="screen === 'onboarding' && membership" class="space-y-4">
       <p class="text-sm font-medium uppercase tracking-wide text-leaf-900">{{ copy.ready }}</p>
       <h2 class="text-2xl font-semibold text-leaf-900">{{ membership.household.name }}</h2>
@@ -516,5 +659,15 @@ async function focusFirstField(): Promise<void> {
 }
 .error {
   @apply mt-1 block min-h-5 text-sm text-red-800;
+}
+.profile-color-option {
+  @apply flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-stone-300 px-3 py-2;
+  @apply text-sm text-stone-950 focus-within:border-leaf-600 focus-within:ring-2 focus-within:ring-leaf-600/30;
+}
+.profile-color-option--selected {
+  @apply border-leaf-700 bg-leaf-50;
+}
+.profile-color-swatch {
+  @apply h-4 w-4 rounded-full ring-1 ring-black/20;
 }
 </style>

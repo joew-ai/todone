@@ -67,6 +67,21 @@ interface EnglishMessages {
     invalidVersion: string;
     conflict: string;
   };
+  profileClient: { sessionEnded: string; requestFailed: string };
+  profileSetup: {
+    heading: string;
+    help: string;
+    displayName: string;
+    color: string;
+    colorRequired: string;
+    displayNameRequired: string;
+    saving: string;
+    save: string;
+    saved: string;
+    loadFailed: string;
+    retry: string;
+  };
+  householdRepository: { missingProfile: string };
 }
 
 export const messages = parse(rawEnglishCatalog) as EnglishMessages;

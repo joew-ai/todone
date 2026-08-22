@@ -10,6 +10,7 @@ import { handler as healthHandler } from '../lambdas/health/index';
 import { handler as sessionHandler } from '../lambdas/session/index';
 import { handler as currentMembershipHandler } from '../lambdas/households/current';
 import { handler as createHouseholdHandler } from '../lambdas/households/create';
+import { handler as familyDirectoryHandler } from '../lambdas/households/directory';
 import {
   readHandler as readProfileHandler,
   updateHandler as updateProfileHandler,
@@ -65,6 +66,14 @@ app.get('/api/v1/profiles/me', async (req, res) => {
   );
 });
 
+app.get('/api/v1/family-members', async (req, res) => {
+  await simulateLambda(
+    (event) => familyDirectoryHandler(event, { repository: householdRepository }),
+    req,
+    res,
+  );
+});
+
 app.put('/api/v1/profiles/me', async (req, res) => {
   await simulateLambda(
     (event) => updateProfileHandler(event, { repository: householdRepository }),
@@ -82,4 +91,5 @@ app.listen(PORT, () => {
   console.log('  POST /api/v1/households');
   console.log('  GET /api/v1/profiles/me');
   console.log('  PUT /api/v1/profiles/me');
+  console.log('  GET /api/v1/family-members');
 });

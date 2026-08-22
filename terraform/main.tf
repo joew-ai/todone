@@ -187,6 +187,7 @@ module "lambdas" {
     session            = var.lambda_artifacts["session"]
     current-membership = var.lambda_artifacts["current-membership"]
     create-household   = var.lambda_artifacts["create-household"]
+    profile            = var.lambda_artifacts["profile"]
   }
 
   function_name    = each.key
@@ -236,6 +237,18 @@ module "api" {
       route_key     = "POST /api/v1/households"
       function_arn  = module.lambdas["create-household"].invoke_arn
       function_name = module.lambdas["create-household"].function_name
+      auth_required = true
+    },
+    {
+      route_key     = "GET /api/v1/profiles/me"
+      function_arn  = module.lambdas["profile"].invoke_arn
+      function_name = module.lambdas["profile"].function_name
+      auth_required = true
+    },
+    {
+      route_key     = "PUT /api/v1/profiles/me"
+      function_arn  = module.lambdas["profile"].invoke_arn
+      function_name = module.lambdas["profile"].function_name
       auth_required = true
     },
   ]

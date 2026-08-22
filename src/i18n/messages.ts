@@ -60,6 +60,13 @@ interface EnglishMessages {
   generic: { unexpectedError: string; networkError: string };
   bootstrap: BootstrapMessages;
   householdClient: { sessionEnded: string; requestFailed: string };
+  profileApi: {
+    unsupportedFields: string;
+    invalidDisplayName: string;
+    invalidColor: string;
+    invalidVersion: string;
+    conflict: string;
+  };
 }
 
 export const messages = parse(rawEnglishCatalog) as EnglishMessages;

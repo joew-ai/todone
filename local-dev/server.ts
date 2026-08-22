@@ -10,6 +10,10 @@ import { handler as healthHandler } from '../lambdas/health/index';
 import { handler as sessionHandler } from '../lambdas/session/index';
 import { handler as currentMembershipHandler } from '../lambdas/households/current';
 import { handler as createHouseholdHandler } from '../lambdas/households/create';
+import {
+  readHandler as readProfileHandler,
+  updateHandler as updateProfileHandler,
+} from '../lambdas/households/profile';
 import { InMemoryHouseholdRepository } from '../lambdas/households/repository';
 
 const app = express();
@@ -53,6 +57,22 @@ app.post('/api/v1/households', async (req, res) => {
   );
 });
 
+app.get('/api/v1/profiles/me', async (req, res) => {
+  await simulateLambda(
+    (event) => readProfileHandler(event, { repository: householdRepository }),
+    req,
+    res,
+  );
+});
+
+app.put('/api/v1/profiles/me', async (req, res) => {
+  await simulateLambda(
+    (event) => updateProfileHandler(event, { repository: householdRepository }),
+    req,
+    res,
+  );
+});
+
 app.listen(PORT, () => {
   console.log(`Todone local API simulator running on http://localhost:${PORT}`);
   console.log('Endpoints:');
@@ -60,4 +80,6 @@ app.listen(PORT, () => {
   console.log('  GET /api/v1/session');
   console.log('  GET /api/v1/memberships/current');
   console.log('  POST /api/v1/households');
+  console.log('  GET /api/v1/profiles/me');
+  console.log('  PUT /api/v1/profiles/me');
 });

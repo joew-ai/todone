@@ -22,7 +22,7 @@ variable "lambda_artifacts" {
 
   validation {
     condition = alltrue([
-      for name in ["session", "current-membership", "create-household", "pre-signup"] :
+      for name in ["session", "current-membership", "create-household", "profile", "pre-signup"] :
       contains(keys(var.lambda_artifacts), name)
     ])
     error_message = "lambda_artifacts must include every bootstrap Lambda."

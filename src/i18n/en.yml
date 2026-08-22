@@ -64,4 +64,12 @@
       'sessionEnded': 'Your session ended. Sign in to continue.',
       'requestFailed': 'We could not save your household. Nothing changed. Try again.',
     },
+  'profileApi':
+    {
+      'unsupportedFields': 'The request contains unsupported fields.',
+      'invalidDisplayName': 'The display name must be 1 to 60 characters.',
+      'invalidColor': 'Choose one of the available profile colors.',
+      'invalidVersion': 'The profile version is invalid.',
+      'conflict': 'This profile changed elsewhere. Review the latest version and try again.',
+    },
 }

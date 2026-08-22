@@ -62,6 +62,7 @@ export const HouseholdErrorCode = {
   invalidUsername: 'INVALID_USERNAME',
   invalidDisplayName: 'INVALID_DISPLAY_NAME',
   invalidProfileColor: 'INVALID_PROFILE_COLOR',
+  profileConflict: 'PROFILE_CONFLICT',
   membershipExists: 'MEMBERSHIP_EXISTS',
   idempotencyConflict: 'IDEMPOTENCY_CONFLICT',
 } as const;

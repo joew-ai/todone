@@ -29,6 +29,7 @@ const DEPLOYABLE_LAMBDAS = {
   session: 'lambdas/session/index.ts',
   'current-membership': 'lambdas/households/current.ts',
   'create-household': 'lambdas/households/create.ts',
+  profile: 'lambdas/households/profile.ts',
   'pre-signup': 'lambdas/pre-signup/index.ts',
 } as const;
 
@@ -71,6 +72,9 @@ async function buildLambda(name: string): Promise<BuildResult> {
     platform: 'node',
     target: 'node20',
     format: 'cjs',
+    // Lambda validation messages share the typed English catalog with the PWA.
+    // Vite handles `?raw` in browser builds; esbuild needs an explicit text loader.
+    loader: { '.yml': 'text' },
     // Handler-only entry: no browser globals, no dev-only local-Cognito
     // branches are excluded here (they are gated by env vars at runtime,
     // not build time, so this bundles the same code path production uses).

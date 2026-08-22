@@ -19,7 +19,7 @@
 
 - [x] 3.1 Add Profile persistence and self-only versioned read/update APIs for display name and canonical profile color; completion: each active member can mutate only their own profile, arbitrary hex values and role/identity overposting are rejected, and later references resolve current values.
 - [x] 3.2 Route a first parent without a Profile from household creation/restoration to required profile setup before family management; completion: display name and one canonical color create exactly one Profile with loading, validation, submitting, retry, session-loss, and success behavior.
-- [ ] 3.3 Add the active/pending family directory API with deterministic ordering and safe fields only; completion: active members include username, display name, role, color, and state, pending parents include their allowed action state, and no recovery email, Cognito status internals, `sub`, or cross-household data is returned.
+- [x] 3.3 Add the active/pending family directory API with deterministic ordering and safe fields only; completion: active members include username, display name, role, color, and state, pending parents include their allowed action state, and no recovery email, Cognito status internals, `sub`, or cross-household data is returned.
 - [ ] 3.4 Implement responsive family management and self-profile UI using shared copy/design tokens; completion: active members and pending parents render name plus color, role, username, and only authorized actions across compact, medium, and wide layouts without relying on color alone.
 
 ## 4. Child Provisioning and Credential Management

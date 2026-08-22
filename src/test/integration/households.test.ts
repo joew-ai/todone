@@ -210,6 +210,7 @@ describe('household bootstrap API and persistence', () => {
           activationState: 'ACTIVE',
           displayName: 'Parent One',
           color: 'PINE',
+          allowedActions: [],
         },
       ],
     });

@@ -167,7 +167,7 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
         ConsistentRead: true,
       }),
     );
-    const memberships = result.Items ?? [];
+    const memberships = (result.Items ?? []).filter(isVisibleDirectoryMembership);
     const members = await Promise.all(
       memberships.map(async (membership) => {
         const memberId = requiredStringAttribute(membership.memberId);
@@ -444,6 +444,15 @@ function directoryMemberFromStoredItem(
     displayName: profile.displayName,
     color: profile.color,
   };
+}
+
+function isVisibleDirectoryMembership(item: Record<string, AttributeValue>): boolean {
+  const activationState = requiredActivationState(item.activationState);
+  if (activationState === MembershipActivationState.active) return true;
+  return (
+    activationState === MembershipActivationState.pendingActivation &&
+    requiredMembershipRole(item.role) === HouseholdRole.parent
+  );
 }
 
 function sortDirectoryMembers(members: FamilyDirectoryMember[]): FamilyDirectoryMember[] {

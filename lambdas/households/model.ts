@@ -1,4 +1,4 @@
-import type { ProfileColorId } from './constants';
+import type { PendingParentAction, ProfileColorId } from './constants';
 
 export type MembershipRole = 'parent' | 'child';
 export type MembershipActivationState = 'ACTIVE' | 'PENDING_ACTIVATION' | 'INACTIVE';
@@ -45,6 +45,13 @@ export interface FamilyDirectoryMember {
   activationState: MembershipActivationState;
   displayName: string;
   color: ProfileColorId;
+}
+
+export type PendingParentActionValue =
+  (typeof PendingParentAction)[keyof typeof PendingParentAction];
+
+export interface FamilyDirectoryEntry extends FamilyDirectoryMember {
+  allowedActions: PendingParentActionValue[];
 }
 
 export interface SaveProfileInput {

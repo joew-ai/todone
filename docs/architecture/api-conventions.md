@@ -93,7 +93,7 @@ GET /api/v1/family-members
 Authorization: Bearer <Cognito-ID-token>
 ```
 
-The caller's verified `sub` resolves the household; the request accepts no target or household identifier. The response contains only `memberId`, immutable `username`, immutable `role`, activation state, and current `displayName`/canonical `color`. It is deterministically ordered by activation state, username, then member ID. Recovery email, Cognito status/details, raw `sub`, household details, and cross-household records are never represented.
+The caller's verified `sub` resolves the household; the request accepts no target or household identifier. The response contains only `memberId`, immutable `username`, immutable `role`, activation state, current `displayName`/canonical `color`, and stable `allowedActions`. It is deterministically ordered by activation state, username, then member ID. Active members have no directory actions. An active parent sees a pending parent with exactly `RESEND_WELCOME`, `CHANGE_EMAIL_AND_RESEND`, and `CANCEL_PENDING_ACCOUNT`; a child receives active members only. Inactive records, recovery email, Cognito status/details, raw `sub`, household details, and cross-household records are never represented.
 
 ## Authentication and authorization
 

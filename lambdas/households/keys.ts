@@ -23,6 +23,13 @@ export function householdMemberKey(householdId: string, memberId: string): House
   };
 }
 
+export function profileKey(householdId: string, memberId: string): HouseholdStorageKey {
+  return {
+    pk: `${HouseholdRecord.householdPrefix}#${householdId}`,
+    sk: `PROFILE#${memberId}`,
+  };
+}
+
 export function bootstrapReplayKey(sub: string, idempotencyKey: string): HouseholdStorageKey {
   return {
     pk: `${HouseholdRecord.userPrefix}#${sub}`,

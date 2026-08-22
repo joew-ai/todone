@@ -2,7 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   DynamoDBClient,
   GetItemCommand,
+  PutItemCommand,
   TransactWriteItemsCommand,
+  ConditionalCheckFailedException,
   TransactionCanceledException,
   type AttributeValue,
 } from '@aws-sdk/client-dynamodb';
@@ -10,7 +12,9 @@ import {
   ATTRIBUTE_DOES_NOT_EXIST,
   HouseholdRole,
   INITIAL_HOUSEHOLD_VERSION,
+  INITIAL_PROFILE_VERSION,
   MembershipActivationState,
+  ProfileColor,
 } from './constants';
 import {
   bootstrapReplayKey,
@@ -18,6 +22,7 @@ import {
   householdMemberKey,
   inMemoryReplayKey,
   membershipLookupKey,
+  profileKey,
   type HouseholdStorageKey,
 } from './keys';
 import type {
@@ -27,6 +32,9 @@ import type {
   HouseholdRepository,
   MembershipActivationState as MembershipActivationStateValue,
   MembershipRole,
+  Profile,
+  SaveProfileInput,
+  SaveProfileResult,
 } from './model';
 
 interface StoredMembership extends CurrentMembership {
@@ -105,6 +113,43 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
     }
   }
 
+  async getProfile(householdId: string, memberId: string): Promise<Profile | null> {
+    const item = await this.getItem(profileKey(householdId, memberId));
+    return item ? profileFromItem(item) : null;
+  }
+
+  async saveProfile(input: SaveProfileInput): Promise<SaveProfileResult> {
+    const existing = await this.getProfile(input.householdId, input.memberId);
+    if (existing && existing.version !== input.version)
+      return { kind: 'conflict', profile: existing };
+    if (!existing && input.version !== 0) return { kind: 'conflict', profile: null };
+
+    const nextProfile: Profile = {
+      memberId: input.memberId,
+      displayName: input.displayName,
+      color: input.color,
+      version: existing ? existing.version + 1 : INITIAL_PROFILE_VERSION,
+    };
+    try {
+      await this.client.send(
+        new PutItemCommand({
+          TableName: this.tableName,
+          Item: profileItem(input.householdId, nextProfile),
+          ConditionExpression: 'attribute_not_exists(pk) OR #version = :expectedVersion',
+          ExpressionAttributeNames: { '#version': 'version' },
+          ExpressionAttributeValues: { ':expectedVersion': numberAttribute(input.version) },
+        }),
+      );
+      return { kind: existing ? 'updated' : 'created', profile: nextProfile };
+    } catch (error) {
+      if (!(error instanceof ConditionalCheckFailedException)) throw error;
+      return {
+        kind: 'conflict',
+        profile: await this.getProfile(input.householdId, input.memberId),
+      };
+    }
+  }
+
   private async readReplay(
     sub: string,
     idempotencyKey: string,
@@ -132,6 +177,7 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
 export class InMemoryHouseholdRepository implements HouseholdRepository {
   private readonly memberships = new Map<string, StoredMembership>();
   private readonly replays = new Map<string, { hash: string; membership: CurrentMembership }>();
+  private readonly profiles = new Map<string, Profile>();
   constructor(private readonly id = randomUUID) {}
 
   async getCurrentMembership(sub: string): Promise<CurrentMembership | null> {
@@ -163,6 +209,27 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
     this.memberships.set(input.sub, { ...structuredClone(membership), sub: input.sub });
     this.replays.set(replayKey, { hash: inputHash, membership: structuredClone(membership) });
     return { kind: 'created', membership };
+  }
+
+  async getProfile(householdId: string, memberId: string): Promise<Profile | null> {
+    const profile = this.profiles.get(profileStorageKey(householdId, memberId)) ?? null;
+    return cloneProfile(profile);
+  }
+
+  async saveProfile(input: SaveProfileInput): Promise<SaveProfileResult> {
+    const key = profileStorageKey(input.householdId, input.memberId);
+    const existing = this.profiles.get(key) ?? null;
+    if (!isExpectedProfileVersion(existing, input.version)) {
+      return { kind: 'conflict', profile: cloneProfile(existing) };
+    }
+    const profile: Profile = {
+      memberId: input.memberId,
+      displayName: input.displayName,
+      color: input.color,
+      version: existing ? existing.version + 1 : INITIAL_PROFILE_VERSION,
+    };
+    this.profiles.set(key, structuredClone(profile));
+    return { kind: existing ? 'updated' : 'created', profile };
   }
 }
 
@@ -252,6 +319,18 @@ function bootstrapReplayItem(
   };
 }
 
+function profileItem(householdId: string, profile: Profile) {
+  const key = profileKey(householdId, profile.memberId);
+  return {
+    pk: stringAttribute(key.pk),
+    sk: stringAttribute(key.sk),
+    memberId: stringAttribute(profile.memberId),
+    displayName: stringAttribute(profile.displayName),
+    color: stringAttribute(profile.color),
+    version: numberAttribute(profile.version),
+  };
+}
+
 function membershipFromStoredItems(
   lookup: Record<string, AttributeValue>,
   membership: Record<string, AttributeValue>,
@@ -291,6 +370,15 @@ function membershipFromReplayItem(item: Record<string, AttributeValue>): Current
   });
 }
 
+function profileFromItem(item: Record<string, AttributeValue>): Profile {
+  return {
+    memberId: requiredStringAttribute(item.memberId),
+    displayName: requiredStringAttribute(item.displayName),
+    color: requiredProfileColor(item.color),
+    version: requiredNumberAttribute(item.version),
+  };
+}
+
 function putItem(
   tableName: string,
   item: Record<string, AttributeValue>,
@@ -308,10 +396,18 @@ function stringAttribute(value: string): AttributeValue {
   return { S: value };
 }
 function numberAttribute(value: number): AttributeValue {
+  // DynamoDB's AttributeValue wire format represents every number as a decimal string.
   return { N: String(value) };
 }
+const INVALID_STORED_HOUSEHOLD_RECORD = 'Stored household record is invalid.';
+function requiredNumberAttribute(value: AttributeValue | undefined): number {
+  if (!value || !('N' in value) || !value.N) throw new Error(INVALID_STORED_HOUSEHOLD_RECORD);
+  const number = Number(value.N);
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error(INVALID_STORED_HOUSEHOLD_RECORD);
+  return number;
+}
 function requiredStringAttribute(value: AttributeValue | undefined): string {
-  if (!value || !('S' in value) || !value.S) throw new Error('Stored household record is invalid.');
+  if (!value || !('S' in value) || !value.S) throw new Error(INVALID_STORED_HOUSEHOLD_RECORD);
   return value.S;
 }
 function requiredMembershipRole(value: AttributeValue | undefined): MembershipRole {
@@ -329,6 +425,23 @@ function requiredActivationState(
     throw new Error('Stored membership activation state is invalid.');
   }
   return state as MembershipActivationStateValue;
+}
+function requiredProfileColor(value: AttributeValue | undefined): Profile['color'] {
+  const color = requiredStringAttribute(value);
+  if (!Object.values(ProfileColor).includes(color as Profile['color'])) {
+    throw new Error('Stored profile color is invalid.');
+  }
+  return color as Profile['color'];
+}
+function profileStorageKey(householdId: string, memberId: string): string {
+  return `${householdId}\0${memberId}`;
+}
+function isExpectedProfileVersion(existing: Profile | null, requestedVersion: number): boolean {
+  // Exact comparison prevents both stale retries and skipped/out-of-order writes.
+  return existing ? existing.version === requestedVersion : requestedVersion === 0;
+}
+function cloneProfile(profile: Profile | null): Profile | null {
+  return profile ? structuredClone(profile) : null;
 }
 function hashInput(name: string, timezone: string, username: string): string {
   return createHash('sha256').update(JSON.stringify({ name, timezone, username })).digest('hex');

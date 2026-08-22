@@ -1,3 +1,5 @@
+import type { ProfileColorId } from './constants';
+
 export type MembershipRole = 'parent' | 'child';
 export type MembershipActivationState = 'ACTIVE' | 'PENDING_ACTIVATION' | 'INACTIVE';
 
@@ -28,6 +30,24 @@ export interface CurrentMembership {
   household: Pick<Household, 'householdId' | 'name' | 'timezone'>;
 }
 
+export interface Profile {
+  memberId: string;
+  displayName: string;
+  color: ProfileColorId;
+  version: number;
+}
+
+export interface SaveProfileInput {
+  householdId: string;
+  memberId: string;
+  displayName: string;
+  color: ProfileColorId;
+  version: number;
+}
+
+export type SaveProfileResult =
+  { kind: 'created' | 'updated'; profile: Profile } | { kind: 'conflict'; profile: Profile | null };
+
 export interface BootstrapInput {
   sub: string;
   username: string;
@@ -44,4 +64,6 @@ export type BootstrapResult =
 export interface HouseholdRepository {
   getCurrentMembership(sub: string): Promise<CurrentMembership | null>;
   bootstrap(input: BootstrapInput): Promise<BootstrapResult>;
+  getProfile(householdId: string, memberId: string): Promise<Profile | null>;
+  saveProfile(input: SaveProfileInput): Promise<SaveProfileResult>;
 }

@@ -129,4 +129,53 @@ describe('household bootstrap API and persistence', () => {
     expect(isResourceInHousehold(membership!, membership!.household.householdId)).toBe(true);
     expect(isResourceInHousehold(membership!, 'another-household')).toBe(false);
   });
+
+  it('creates and version-updates a member profile without accepting stale writes', async () => {
+    const repository = new InMemoryHouseholdRepository(() => 'generated-id');
+    await expect(repository.getProfile('missing-household', 'missing-member')).resolves.toBeNull();
+    const bootstrap = await repository.bootstrap({
+      sub: 'sub-one',
+      username: 'parent',
+      idempotencyKey: 'one',
+      name: 'River House',
+      timezone: 'America/Chicago',
+    });
+    if (bootstrap.kind !== 'created') throw new Error('Expected a new membership.');
+
+    const create = await repository.saveProfile({
+      householdId: bootstrap.membership.household.householdId,
+      memberId: bootstrap.membership.memberId,
+      displayName: 'Parent One',
+      color: 'PINE',
+      version: 0,
+    });
+    expect(create).toMatchObject({ kind: 'created', profile: { version: 1 } });
+
+    const update = await repository.saveProfile({
+      householdId: bootstrap.membership.household.householdId,
+      memberId: bootstrap.membership.memberId,
+      displayName: 'Parent Uno',
+      color: 'LAKE',
+      version: 1,
+    });
+    expect(update).toMatchObject({ kind: 'updated', profile: { version: 2 } });
+
+    const stale = await repository.saveProfile({
+      householdId: bootstrap.membership.household.householdId,
+      memberId: bootstrap.membership.memberId,
+      displayName: 'Stale',
+      color: 'DUSK',
+      version: 1,
+    });
+    expect(stale).toMatchObject({ kind: 'conflict', profile: { version: 2 } });
+
+    const skipped = await repository.saveProfile({
+      householdId: bootstrap.membership.household.householdId,
+      memberId: bootstrap.membership.memberId,
+      displayName: 'Skipped',
+      color: 'DUSK',
+      version: 3,
+    });
+    expect(skipped).toMatchObject({ kind: 'conflict', profile: { version: 2 } });
+  });
 });

@@ -20,6 +20,8 @@ export const ProfileColor = {
   dusk: 'DUSK',
 } as const;
 
+export type ProfileColorId = (typeof ProfileColor)[keyof typeof ProfileColor];
+
 export const ProfileColorHex = {
   [ProfileColor.pine]: '#2F6B4F',
   [ProfileColor.fern]: '#4D7C3F',
@@ -65,7 +67,9 @@ export const HouseholdErrorCode = {
 } as const;
 
 export const MAX_HOUSEHOLD_NAME_LENGTH = 80;
+export const MAX_DISPLAY_NAME_LENGTH = 60;
 export const MAX_IDEMPOTENCY_KEY_LENGTH = 200;
 /** Reserved for optimistic concurrency checks when household updates are added. */
 export const INITIAL_HOUSEHOLD_VERSION = 1;
+export const INITIAL_PROFILE_VERSION = 1;
 export const ATTRIBUTE_DOES_NOT_EXIST = 'attribute_not_exists(pk)';

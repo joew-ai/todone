@@ -1,11 +1,12 @@
 import {
   ProfileColor,
+  type ProfileColorId,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from './constants';
 
-export type CanonicalProfileColor = (typeof ProfileColor)[keyof typeof ProfileColor];
+export type CanonicalProfileColor = ProfileColorId;
 
 /** Usernames are immutable display copies; Cognito remains their uniqueness authority. */
 export function normalizeUsername(value: string): string {

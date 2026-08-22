@@ -1,4 +1,5 @@
 export type MembershipRole = 'parent' | 'child';
+export type MembershipActivationState = 'ACTIVE' | 'PENDING_ACTIVATION' | 'INACTIVE';
 
 export interface Household {
   householdId: string;
@@ -13,19 +14,23 @@ export interface Membership {
   memberId: string;
   householdId: string;
   sub: string;
+  username: string;
   role: MembershipRole;
-  active: boolean;
+  activationState: MembershipActivationState;
+  credentialsValidAfter?: string;
   createdAt: string;
 }
 
 export interface CurrentMembership {
   memberId: string;
+  username: string;
   role: MembershipRole;
   household: Pick<Household, 'householdId' | 'name' | 'timezone'>;
 }
 
 export interface BootstrapInput {
   sub: string;
+  username: string;
   idempotencyKey: string;
   name: string;
   timezone: string;

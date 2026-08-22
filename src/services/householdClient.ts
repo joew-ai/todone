@@ -1,5 +1,6 @@
 export interface CurrentMembership {
   memberId: string;
+  username: string;
   role: 'parent' | 'child';
   household: { householdId: string; name: string; timezone: string };
 }

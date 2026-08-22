@@ -130,6 +130,32 @@ describe('ProductionBootstrap', () => {
     expect(wrapper.text()).toContain('already in use');
   });
 
+  it('labels the registration gate as Entry Code and blocks weak account passwords', async () => {
+    const wrapper = mount(ProductionBootstrap, { attachTo: document.body });
+    await flushPromises();
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Create first-parent'))!
+      .trigger('click');
+    await wrapper.get('input[autocomplete="username"]').setValue('ParentOne');
+    await wrapper.get('input[autocomplete="email"]').setValue('parent@example.invalid');
+    await wrapper.get('input[autocomplete="off"]').setValue('gate-private');
+    await wrapper.get('input[autocomplete="new-password"]').setValue('weak');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    const passwordField = wrapper.get('input[autocomplete="new-password"]');
+    expect(wrapper.text()).toContain('Entry Code');
+    expect(wrapper.text()).not.toContain('Registration password');
+    expect(wrapper.text()).toContain(
+      'including an uppercase letter, lowercase letter, number, and symbol',
+    );
+    expect(passwordField.attributes('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(passwordField.element);
+    expect(registerFirstParent).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it('offers generic Forgot Password initiation and completes recovery', async () => {
     forgotPassword.mockResolvedValue({ kind: 'success' });
     confirmForgotPassword.mockResolvedValue({ kind: 'success' });
@@ -153,6 +179,32 @@ describe('ProductionBootstrap', () => {
       'NewStrongPassword123!',
     );
     expect(wrapper.get('h2').text()).toBe('Sign in');
+  });
+
+  it('shows the same password policy and focuses the recovery password after weak input', async () => {
+    forgotPassword.mockResolvedValue({ kind: 'success' });
+    const wrapper = mount(ProductionBootstrap, { attachTo: document.body });
+    await flushPromises();
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Forgot'))!
+      .trigger('click');
+    await wrapper.get('input[autocomplete="username"]').setValue('ParentOne');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    await wrapper.get('input[autocomplete="one-time-code"]').setValue('123456');
+    await wrapper.get('input[autocomplete="new-password"]').setValue('weak');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    const passwordField = wrapper.get('input[autocomplete="new-password"]');
+    expect(wrapper.text()).toContain(
+      'including an uppercase letter, lowercase letter, number, and symbol',
+    );
+    expect(passwordField.attributes('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(passwordField.element);
+    expect(confirmForgotPassword).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it('validates household name with focus, then lands on onboarding after creation', async () => {

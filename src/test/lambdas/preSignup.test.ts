@@ -1,16 +1,19 @@
 import { createHash } from 'node:crypto';
 import type { PreSignUpTriggerEvent } from 'aws-lambda';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { handler } from '../../../lambdas/pre-signup/index';
+import { handler, preSignUpPolicy } from '../../../lambdas/pre-signup/index';
 
-function event(password?: string): PreSignUpTriggerEvent {
+function event(
+  password?: string,
+  triggerSource: PreSignUpTriggerEvent['triggerSource'] = 'PreSignUp_SignUp',
+): PreSignUpTriggerEvent {
   return {
     version: '1',
     region: 'us-east-1',
     userPoolId: 'pool',
     userName: 'parent',
     callerContext: { awsSdkVersion: 'test', clientId: 'client' },
-    triggerSource: 'PreSignUp_SignUp',
+    triggerSource,
     request: {
       userAttributes: { email: 'private@example.invalid' },
       validationData: password === undefined ? undefined : { registrationGatePassword: password },
@@ -66,4 +69,28 @@ describe('Cognito pre-signup registration gate', () => {
     expect(log).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
+
+  it('permits independently IAM-authorized administrative creation without an Entry Code', async () => {
+    const result = await handler(event(undefined, 'PreSignUp_AdminCreateUser'));
+
+    expect(result.response).toEqual({
+      autoConfirmUser: false,
+      autoVerifyEmail: false,
+      autoVerifyPhone: false,
+    });
+  });
+
+  it('keeps the public and administrative trigger sources as explicit independent policies', () => {
+    expect(preSignUpPolicy('PreSignUp_SignUp')).toBe('require-entry-code');
+    expect(preSignUpPolicy('PreSignUp_AdminCreateUser')).toBe('allow-admin');
+  });
+
+  it.each(['PreSignUp_ExternalProvider', 'PreSignUp_Unknown'])(
+    'fails closed for unexpected source %s',
+    async (triggerSource) => {
+      await expect(
+        handler(event(undefined, triggerSource as PreSignUpTriggerEvent['triggerSource'])),
+      ).rejects.toThrow('UNSUPPORTED_PRE_SIGN_UP_SOURCE');
+    },
+  );
 });

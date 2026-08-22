@@ -164,7 +164,7 @@ describe('AuthClient', () => {
     );
     expect(result).toEqual({ kind: 'success' });
     expect(signUpMock).toHaveBeenCalledWith(
-      'ParentOne',
+      'parentone',
       'StrongPassword123!',
       [expect.objectContaining({ data: { Name: 'email', Value: 'parent@example.invalid' } })],
       [
@@ -174,6 +174,33 @@ describe('AuthClient', () => {
       ],
       expect.any(Function),
     );
+  });
+
+  it('normalizes a valid public-registration username before Cognito receives it', async () => {
+    signUpMock.mockImplementation((_username, _password, _attributes, _validationData, callback) =>
+      callback(null, {}),
+    );
+
+    await buildClient().registerFirstParent(
+      '  Fun-Kid_1 ',
+      'StrongPassword123!',
+      'parent@example.invalid',
+      'gate-secret',
+    );
+
+    expect(signUpMock.mock.calls[0]?.[0]).toBe('fun-kid_1');
+  });
+
+  it('rejects invalid public-registration usernames before calling Cognito', async () => {
+    const result = await buildClient().registerFirstParent(
+      'not valid',
+      'StrongPassword123!',
+      'parent@example.invalid',
+      'gate-secret',
+    );
+
+    expect(result).toMatchObject({ kind: 'error', field: 'username', recoverable: true });
+    expect(signUpMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -204,6 +231,22 @@ describe('AuthClient', () => {
     }
   });
 
+  it('maps a rejected registration password to the shared policy guidance', async () => {
+    signUpMock.mockImplementation((_a, _b, _c, _d, callback) =>
+      callback({ code: 'InvalidPasswordException' }),
+    );
+
+    const result = await buildClient().registerFirstParent(
+      'ParentOne',
+      'weak',
+      'p@example.invalid',
+      'private-gate',
+    );
+
+    expect(result).toMatchObject({ kind: 'error', field: 'password', recoverable: true });
+    if (result.kind === 'error') expect(result.message).toContain('uppercase letter');
+  });
+
   it('confirms registration and maps invalid or expired codes to field guidance', async () => {
     confirmRegistrationMock.mockImplementation((_code, _forceAlias, callback) =>
       callback({ code: 'ExpiredCodeException' }),
@@ -232,6 +275,7 @@ describe('AuthClient', () => {
     );
     const result = await buildClient().confirmForgotPassword('parent', '123456', 'weak');
     expect(result).toMatchObject({ kind: 'error', field: 'password', recoverable: true });
+    if (result.kind === 'error') expect(result.message).toContain('uppercase letter');
   });
 
   it('returns a generic invalid-credentials error for incorrect username or password', async () => {

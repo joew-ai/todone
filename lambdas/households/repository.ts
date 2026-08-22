@@ -6,7 +6,12 @@ import {
   TransactionCanceledException,
   type AttributeValue,
 } from '@aws-sdk/client-dynamodb';
-import { ATTRIBUTE_DOES_NOT_EXIST, HouseholdRole, INITIAL_HOUSEHOLD_VERSION } from './constants';
+import {
+  ATTRIBUTE_DOES_NOT_EXIST,
+  HouseholdRole,
+  INITIAL_HOUSEHOLD_VERSION,
+  MembershipActivationState,
+} from './constants';
 import {
   bootstrapReplayKey,
   householdKey,
@@ -20,6 +25,7 @@ import type {
   BootstrapResult,
   CurrentMembership,
   HouseholdRepository,
+  MembershipActivationState as MembershipActivationStateValue,
   MembershipRole,
 } from './model';
 
@@ -37,14 +43,22 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
 
   async getCurrentMembership(sub: string): Promise<CurrentMembership | null> {
     const lookup = await this.getItem(membershipLookupKey(sub));
-    if (!lookup || !booleanAttributeValue(lookup.active)) return null;
+    if (!lookup) return null;
+    if (requiredActivationState(lookup.activationState) !== MembershipActivationState.active) {
+      return null;
+    }
     const householdId = requiredStringAttribute(lookup.householdId);
-    const household = await this.getItem(householdKey(householdId));
-    return household ? membershipFromStoredItems(lookup, household) : null;
+    const memberId = requiredStringAttribute(lookup.memberId);
+    const [household, membership] = await Promise.all([
+      this.getItem(householdKey(householdId)),
+      this.getItem(householdMemberKey(householdId, memberId)),
+    ]);
+    if (!household || !membership) return null;
+    return membershipFromStoredItems(lookup, membership, household, sub);
   }
 
   async bootstrap(input: BootstrapInput): Promise<BootstrapResult> {
-    const inputHash = hashInput(input.name, input.timezone);
+    const inputHash = hashInput(input.name, input.timezone, input.username);
     const replay = await this.readReplay(input.sub, input.idempotencyKey, inputHash);
     if (replay) return replay;
 
@@ -56,6 +70,7 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
       memberId,
       name: input.name,
       timezone: input.timezone,
+      username: input.username,
     });
     try {
       await this.client.send(
@@ -63,13 +78,13 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
           TransactItems: [
             putItem(
               this.tableName,
-              membershipLookupItem(input.sub, householdId, memberId),
+              membershipLookupItem(input.sub, input.username, householdId, memberId),
               ATTRIBUTE_DOES_NOT_EXIST,
             ),
             putItem(this.tableName, householdItem(householdId, input, createdAt)),
             putItem(
               this.tableName,
-              householdMemberItem(householdId, memberId, input.sub, createdAt),
+              householdMemberItem(householdId, memberId, input.sub, input.username, createdAt),
             ),
             putItem(
               this.tableName,
@@ -129,7 +144,7 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
 
   async bootstrap(input: BootstrapInput): Promise<BootstrapResult> {
     const replayKey = inMemoryReplayKey(input.sub, input.idempotencyKey);
-    const inputHash = hashInput(input.name, input.timezone);
+    const inputHash = hashInput(input.name, input.timezone, input.username);
     const replay = this.replays.get(replayKey);
     if (replay) {
       return replay.hash === inputHash
@@ -143,6 +158,7 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
       householdId: this.id(),
       name: input.name,
       timezone: input.timezone,
+      username: input.username,
     });
     this.memberships.set(input.sub, { ...structuredClone(membership), sub: input.sub });
     this.replays.set(replayKey, { hash: inputHash, membership: structuredClone(membership) });
@@ -155,23 +171,31 @@ function currentMembership(input: {
   householdId: string;
   name: string;
   timezone: string;
+  username: string;
 }): CurrentMembership {
   return {
     memberId: input.memberId,
+    username: input.username,
     role: HouseholdRole.parent,
     household: { householdId: input.householdId, name: input.name, timezone: input.timezone },
   };
 }
 
-function membershipLookupItem(sub: string, householdId: string, memberId: string) {
+function membershipLookupItem(
+  sub: string,
+  username: string,
+  householdId: string,
+  memberId: string,
+) {
   const key = membershipLookupKey(sub);
   return {
     pk: stringAttribute(key.pk),
     sk: stringAttribute(key.sk),
     householdId: stringAttribute(householdId),
     memberId: stringAttribute(memberId),
+    username: stringAttribute(username),
     role: stringAttribute(HouseholdRole.parent),
-    active: booleanAttribute(true),
+    activationState: stringAttribute(MembershipActivationState.active),
   };
 }
 
@@ -193,6 +217,7 @@ function householdMemberItem(
   householdId: string,
   memberId: string,
   sub: string,
+  username: string,
   createdAt: string,
 ) {
   const key = householdMemberKey(householdId, memberId);
@@ -201,8 +226,9 @@ function householdMemberItem(
     sk: stringAttribute(key.sk),
     memberId: stringAttribute(memberId),
     sub: stringAttribute(sub),
+    username: stringAttribute(username),
     role: stringAttribute(HouseholdRole.parent),
-    active: booleanAttribute(true),
+    activationState: stringAttribute(MembershipActivationState.active),
     createdAt: stringAttribute(createdAt),
   };
 }
@@ -222,15 +248,30 @@ function bootstrapReplayItem(
     memberId: stringAttribute(memberId),
     name: stringAttribute(input.name),
     timezone: stringAttribute(input.timezone),
+    username: stringAttribute(input.username),
   };
 }
 
 function membershipFromStoredItems(
   lookup: Record<string, AttributeValue>,
+  membership: Record<string, AttributeValue>,
   household: Record<string, AttributeValue>,
+  sub: string,
 ): CurrentMembership {
+  const memberId = requiredStringAttribute(lookup.memberId);
+  const username = requiredStringAttribute(lookup.username);
+  if (
+    requiredStringAttribute(membership.memberId) !== memberId ||
+    requiredStringAttribute(membership.sub) !== sub ||
+    requiredStringAttribute(membership.username) !== username ||
+    requiredMembershipRole(membership.role) !== requiredMembershipRole(lookup.role) ||
+    requiredActivationState(membership.activationState) !== MembershipActivationState.active
+  ) {
+    throw new Error('Stored membership lookup is inconsistent.');
+  }
   return {
-    memberId: requiredStringAttribute(lookup.memberId),
+    memberId,
+    username,
     role: requiredMembershipRole(lookup.role),
     household: {
       householdId: requiredStringAttribute(lookup.householdId),
@@ -246,6 +287,7 @@ function membershipFromReplayItem(item: Record<string, AttributeValue>): Current
     householdId: requiredStringAttribute(item.householdId),
     name: requiredStringAttribute(item.name),
     timezone: requiredStringAttribute(item.timezone),
+    username: requiredStringAttribute(item.username),
   });
 }
 
@@ -268,12 +310,6 @@ function stringAttribute(value: string): AttributeValue {
 function numberAttribute(value: number): AttributeValue {
   return { N: String(value) };
 }
-function booleanAttribute(value: boolean): AttributeValue {
-  return { BOOL: value };
-}
-function booleanAttributeValue(value: AttributeValue | undefined): boolean {
-  return Boolean(value && 'BOOL' in value && value.BOOL);
-}
 function requiredStringAttribute(value: AttributeValue | undefined): string {
   if (!value || !('S' in value) || !value.S) throw new Error('Stored household record is invalid.');
   return value.S;
@@ -284,6 +320,16 @@ function requiredMembershipRole(value: AttributeValue | undefined): MembershipRo
     throw new Error('Stored role is invalid.');
   return role;
 }
-function hashInput(name: string, timezone: string): string {
-  return createHash('sha256').update(JSON.stringify({ name, timezone })).digest('hex');
+function requiredActivationState(
+  value: AttributeValue | undefined,
+): MembershipActivationStateValue {
+  const state = requiredStringAttribute(value);
+  const allowedActivationStates = Object.values(MembershipActivationState);
+  if (!allowedActivationStates.includes(state as MembershipActivationStateValue)) {
+    throw new Error('Stored membership activation state is invalid.');
+  }
+  return state as MembershipActivationStateValue;
+}
+function hashInput(name: string, timezone: string, username: string): string {
+  return createHash('sha256').update(JSON.stringify({ name, timezone, username })).digest('hex');
 }

@@ -22,7 +22,12 @@ export interface BootstrapMessages {
   username: string;
   recoveryEmail: string;
   password: string;
-  registrationPassword: string;
+  entryCode: string;
+  entryCodeHelp: string;
+  entryCodeInvalid: string;
+  usernamePolicyError: string;
+  passwordPolicy: string;
+  passwordPolicyError: string;
   creatingAccount: string;
   createAccount: string;
   backToSignIn: string;

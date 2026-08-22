@@ -10,6 +10,7 @@ import {
 } from '../shared/responses';
 import type { TokenVerifier } from '../session/verifier';
 import { HouseholdErrorCode, MAX_IDEMPOTENCY_KEY_LENGTH } from './constants';
+import { isValidUsername, normalizeUsername, usernameValidationMessage } from './familyValidation';
 import type { HouseholdRepository } from './model';
 import { getHouseholdRepository } from './runtime';
 import { validateHouseholdInput } from './validation';
@@ -51,8 +52,19 @@ export async function handler(
       return validationFailedResponse(requestId, validation.fieldErrors);
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
+    const username = normalizeUsername(identity.username);
+    if (!isValidUsername(username)) {
+      return validationFailedResponse(requestId, [
+        {
+          field: 'username',
+          code: HouseholdErrorCode.invalidUsername,
+          message: usernameValidationMessage(),
+        },
+      ]);
+    }
     const result = await repository.bootstrap({
       sub: identity.sub,
+      username,
       idempotencyKey,
       ...validation.value,
     });

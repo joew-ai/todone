@@ -84,7 +84,7 @@ Authentication proves a Cognito `sub`. Each application request then resolves ac
 ## Enforcement rules
 
 1. API Gateway rejects an invalid JWT before protected handlers.
-2. Lambda derives `sub` only from verified claims and reads active Membership for every household route.
+2. Lambda derives `sub` only from verified claims and reads a lookup plus matching active Membership for every household route; pending, inactive, or inconsistent records deny access.
 3. Data keys use the resolved household, not a client household field.
 4. The operation checks role, target membership, ownership, and lifecycle before persistence or Cognito administration.
 5. Cross-household or hidden resources return the same safe result as absence.

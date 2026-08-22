@@ -6,7 +6,14 @@ import {
   type CognitoUserSession,
 } from 'amazon-cognito-identity-js';
 import type { AuthConfig } from '../config/authConfig';
+import { messages } from '../i18n/messages';
 import { getErrorCode, getErrorMessage, mapAuthError } from './authErrors';
+import { isValidUsername, normalizeUsernameForCognito } from './username';
+
+const CognitoErrorCode = {
+  invalidPassword: 'InvalidPasswordException',
+  usernameExists: 'UsernameExistsException',
+} as const;
 
 export interface AuthSession {
   idToken: string;
@@ -72,12 +79,21 @@ export class AuthClient {
     email: string,
     registrationGatePassword: string,
   ): Promise<AuthActionResult> {
+    const canonicalUsername = normalizeUsernameForCognito(username);
+    if (!isValidUsername(canonicalUsername)) {
+      return {
+        kind: 'error',
+        field: 'username',
+        message: messages.bootstrap.usernamePolicyError,
+        recoverable: true,
+      };
+    }
     if (this.config.localEndpoint) {
-      return this.registerLocal(username, password, email, registrationGatePassword);
+      return this.registerLocal(canonicalUsername, password, email, registrationGatePassword);
     }
     return new Promise((resolve) => {
       this.pool.signUp(
-        username,
+        canonicalUsername,
         password,
         [new CognitoUserAttribute({ Name: 'email', Value: email })],
         [
@@ -346,7 +362,7 @@ export class AuthClient {
 function registrationError(error: unknown): Extract<AuthActionResult, { kind: 'error' }> {
   const code = getErrorCode(error);
   const message = getErrorMessage(error) ?? '';
-  if (code === 'UsernameExistsException') {
+  if (code === CognitoErrorCode.usernameExists) {
     return {
       kind: 'error',
       field: 'username',
@@ -361,7 +377,15 @@ function registrationError(error: unknown): Extract<AuthActionResult, { kind: 'e
     return {
       kind: 'error',
       field: 'registrationGatePassword',
-      message: 'The registration password is not valid.',
+      message: messages.bootstrap.entryCodeInvalid,
+      recoverable: true,
+    };
+  }
+  if (code === CognitoErrorCode.invalidPassword) {
+    return {
+      kind: 'error',
+      field: 'password',
+      message: messages.bootstrap.passwordPolicyError,
       recoverable: true,
     };
   }
@@ -382,11 +406,11 @@ function confirmationError(error: unknown): Extract<AuthActionResult, { kind: 'e
 }
 
 function passwordResetError(error: unknown): Extract<AuthActionResult, { kind: 'error' }> {
-  if (getErrorCode(error) === 'InvalidPasswordException') {
+  if (getErrorCode(error) === CognitoErrorCode.invalidPassword) {
     return {
       kind: 'error',
       field: 'password',
-      message: 'Choose a stronger password and try again.',
+      message: messages.bootstrap.passwordPolicyError,
       recoverable: true,
     };
   }

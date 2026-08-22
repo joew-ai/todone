@@ -39,6 +39,7 @@ describe('household bootstrap API and persistence', () => {
     expect(response.statusCode).toBe(201);
     expect(JSON.parse(response.body ?? '{}').membership).toEqual({
       memberId: 'generated-id',
+      username: 'parent',
       role: 'parent',
       household: { householdId: 'generated-id', name: 'River House', timezone: 'America/Chicago' },
     });
@@ -118,6 +119,7 @@ describe('household bootstrap API and persistence', () => {
     const repository = new InMemoryHouseholdRepository();
     await repository.bootstrap({
       sub: 'sub-one',
+      username: 'parent',
       idempotencyKey: 'one',
       name: 'One',
       timezone: 'America/Chicago',

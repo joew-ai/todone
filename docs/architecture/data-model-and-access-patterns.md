@@ -19,8 +19,8 @@ The following key families are canonical logical prefixes. An implementation may
 | Item | Primary key family | Required attributes and invariants |
 | --- | --- | --- |
 | Household | `pk=HOUSEHOLD#<householdId>`, `sk=HOUSEHOLD` | Name, valid IANA timezone, created timestamp, version. |
-| User membership lookup | `pk=USER#<sub>`, `sk=MEMBERSHIP` | Household ID, member ID, immutable role, active state. At most one active household per `sub`. |
-| Membership | `pk=HOUSEHOLD#<householdId>`, `sk=MEMBER#<memberId>` | Cognito `sub`, immutable `parent` or `child` role, activation state, creation timestamp. |
+| User membership lookup | `pk=USER#<sub>`, `sk=MEMBERSHIP` | Household ID, member ID, immutable canonical username and role, activation state. At most one active household per `sub`. |
+| Membership | `pk=HOUSEHOLD#<householdId>`, `sk=MEMBER#<memberId>` | Cognito `sub`, immutable canonical username and `parent` or `child` role, activation state, optional credential-validity cutoff, creation timestamp. |
 | Profile | `pk=HOUSEHOLD#<householdId>`, `sk=PROFILE#<memberId>` | Mutable non-unique display name and palette color. No credential or recovery email. |
 | Todo | `pk=HOUSEHOLD#<householdId>`, `sk=TODO#<todoId>` | Title, scalar assignee member ID, optional date-only due value, lifecycle, version, creation and completion metadata, optional label ID, and optional recurrence provenance. |
 | Label | `pk=HOUSEHOLD#<householdId>`, `sk=LABEL#<labelId>` | Trimmed display name and case-folded comparison key, unique within the household. |
@@ -33,7 +33,7 @@ The logical prefixes do not permit direct string concatenation from unvalidated 
 
 | Access pattern | Authorization and query requirement |
 | --- | --- |
-| Resolve current membership by JWT `sub` | Strongly read `USER#<sub>/MEMBERSHIP`; reject absent, inactive, or inconsistent membership. Do not accept a household ID from the client as a substitute. |
+| Resolve current membership by JWT `sub` | Strongly read `USER#<sub>/MEMBERSHIP`, then the referenced household Membership; reject absent, inactive, pending, or inconsistent lookup/Membership data. Do not accept a household ID from the client as a substitute. |
 | Bootstrap one household for an unattached user | Condition that no user lookup exists, and atomically or idempotently create Household, initial parent Membership, and lookup. Concurrent retries produce one household. Profile data is introduced by the later family-account capability. |
 | Read household and current member | Use household ID obtained from the active lookup, then keyed reads. |
 | List active household members | Query the household member key range; exclude inactive or partially provisioned members. |
@@ -67,7 +67,7 @@ Recurrence storage MUST support discovery of templates eligible for a server-sid
 ### Identity and membership
 
 - `sub` never changes for an existing Cognito identity.
-- Username is authentication data used for display only where the product requires it. It is not a partition key for owned data.
+- Username is an immutable canonical lowercase (`a-z`, `0-9`, `-`, `_`; 3–24 character) Membership copy used for display only where the product requires it. Cognito remains the global uniqueness authority; username is not a partition key for owned data.
 - A self-registered unattached identity can create exactly one household. Later household accounts are parent-provisioned.
 - Role is set when Membership is created and is immutable. Parent removal/demotion and role mutation are not supported.
 - An inactive or deleted Membership fails authorization even if a previously issued JWT remains cryptographically valid.

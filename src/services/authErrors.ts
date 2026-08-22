@@ -1,3 +1,5 @@
+import { messages } from '../i18n/messages';
+
 export interface AuthErrorResult {
   message: string;
   recoverable: boolean;
@@ -68,4 +70,3 @@ export function getErrorMessage(error: unknown): string | undefined {
   const message = (error as { message?: unknown }).message;
   return typeof message === 'string' ? message : undefined;
 }
-import { messages } from '../i18n/messages';

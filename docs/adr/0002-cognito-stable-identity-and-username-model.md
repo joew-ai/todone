@@ -11,6 +11,8 @@ Children need accounts without email addresses, parents need a recovery path, an
 
 Use the replacement case-insensitive Cognito username/password pool. Usernames are globally unique within the Todone pool and immutable. Email and phone remain optional pool attributes; delivered parent flows may require a verified email for recovery while child accounts require neither.
 
+Todone, rather than Cognito's broader username policy, enforces its product username contract before every public or administrative Cognito creation call: lowercase `a-z`, `0-9`, `-`, and `_` only, with a length of 3–24. The browser normalizes a public registration username to lowercase before calling Cognito; later server-side provisioning does the same. Cognito therefore stores the canonical lowercase username, which is also the display copy held on Membership.
+
 Use the Cognito `sub` claim as the stable authenticated identity and Membership identity key. Never use username, email, display name, or profile color as an ownership key. Store mutable, non-unique display name and profile color in application profile data.
 
 The browser app client is public and has no client secret. Passwords, setup secrets, JWT values, and recovery contact values are never stored in Todone application data or logs.

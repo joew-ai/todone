@@ -2,6 +2,7 @@
 import { nextTick, onMounted, ref, watch } from 'vue';
 import { loadAuthConfig } from '../config/authConfig';
 import { messages } from '../i18n/messages';
+import { meetsAccountPasswordPolicy } from '../services/accountPassword';
 import { AuthClient, type AuthActionResult } from '../services/authClient';
 import {
   createHousehold,
@@ -47,6 +48,8 @@ const timezone = ref(browserTimezone());
 const membership = ref<CurrentMembership | null>(null);
 const fieldError = ref<Record<string, string>>({});
 const firstField = ref<{ focus(): void } | null>(null);
+const registrationPasswordField = ref<{ focus(): void } | null>(null);
+const resetPasswordField = ref<{ focus(): void } | null>(null);
 let idempotencyKey = globalThis.crypto.randomUUID();
 let authClient: AuthClient | null = null;
 
@@ -77,6 +80,7 @@ async function signIn(): Promise<void> {
 }
 
 async function register(): Promise<void> {
+  if (!(await validatePassword(password.value, registrationPasswordField))) return;
   await run(async () => {
     const result = await client().registerFirstParent(
       username.value,
@@ -125,6 +129,7 @@ async function startRecovery(): Promise<void> {
 }
 
 async function finishRecovery(): Promise<void> {
+  if (!(await validatePassword(newPassword.value, resetPasswordField))) return;
   await run(async () => {
     const result = await client().confirmForgotPassword(
       username.value,
@@ -248,6 +253,19 @@ function showError(result: Extract<AuthActionResult, { kind: 'error' }>): void {
   if (result.field) fieldError.value[result.field] = result.message;
 }
 
+async function validatePassword(
+  candidate: string,
+  passwordField: { value: { focus(): void } | null },
+): Promise<boolean> {
+  if (meetsAccountPasswordPolicy(candidate)) return true;
+  fieldError.value.password = copy.passwordPolicyError;
+  status.value = copy.passwordPolicyError;
+  statusIsError.value = true;
+  await nextTick();
+  passwordField.value?.focus();
+  return false;
+}
+
 function client(): AuthClient {
   if (!authClient) authClient = new AuthClient(loadAuthConfig());
   return authClient;
@@ -286,12 +304,8 @@ async function focusFirstField(): Promise<void> {
     <form v-else-if="screen === 'signin'" class="space-y-4" @submit.prevent="signIn">
       <h2 class="text-xl font-semibold text-leaf-900">{{ copy.signIn }}</h2>
       <label class="block"
-        >Username<input
-          v-model="username"
-          required
-          autocomplete="username"
-          class="field"
-          :disabled="busy"
+        >{{ copy.username
+        }}<input v-model="username" required autocomplete="username" class="field" :disabled="busy"
       /></label>
       <label class="block"
         >Password<input
@@ -327,30 +341,41 @@ async function focusFirstField(): Promise<void> {
         /><span v-if="fieldError.username" class="error">{{ fieldError.username }}</span></label
       >
       <label class="block"
-        >Recovery email<input
-          v-model="email"
-          required
-          type="email"
-          autocomplete="email"
-          class="field"
+        >{{ copy.recoveryEmail
+        }}<input v-model="email" required type="email" autocomplete="email" class="field"
       /></label>
       <label class="block"
-        >Password<input
+        >{{ copy.password
+        }}<input
+          ref="registrationPasswordField"
           v-model="password"
           required
           type="password"
           autocomplete="new-password"
           class="field"
-      /></label>
+          :aria-invalid="!!fieldError.password"
+          aria-describedby="registration-password-policy registration-password-error"
+        /><span id="registration-password-policy" class="mt-1 block text-sm text-stone-600">{{
+          copy.passwordPolicy
+        }}</span
+        ><span id="registration-password-error" class="error">{{
+          fieldError.password
+        }}</span></label
+      >
       <label class="block"
-        >Registration password<input
+        >{{ copy.entryCode
+        }}<input
           v-model="gatePassword"
           required
           type="password"
           autocomplete="off"
           class="field"
           :aria-invalid="!!fieldError.registrationGatePassword"
-        /><span v-if="fieldError.registrationGatePassword" class="error">{{
+          aria-describedby="entry-code-help entry-code-error"
+        /><span id="entry-code-help" class="mt-1 block text-sm text-stone-600">{{
+          copy.entryCodeHelp
+        }}</span
+        ><span id="entry-code-error" class="error">{{
           fieldError.registrationGatePassword
         }}</span></label
       >
@@ -395,7 +420,8 @@ async function focusFirstField(): Promise<void> {
     <form v-else-if="screen === 'reset'" class="space-y-4" @submit.prevent="finishRecovery">
       <h2 class="text-xl font-semibold text-leaf-900">{{ copy.choosePassword }}</h2>
       <label class="block"
-        >Recovery code<input
+        >{{ copy.recoveryCode
+        }}<input
           v-model="code"
           required
           autocomplete="one-time-code"
@@ -403,14 +429,21 @@ async function focusFirstField(): Promise<void> {
           :aria-invalid="!!fieldError.code"
       /></label>
       <label class="block"
-        >New password<input
+        >{{ copy.newPassword
+        }}<input
+          ref="resetPasswordField"
           v-model="newPassword"
           required
           type="password"
           autocomplete="new-password"
           class="field"
           :aria-invalid="!!fieldError.password"
-      /></label>
+          aria-describedby="reset-password-policy reset-password-error"
+        /><span id="reset-password-policy" class="mt-1 block text-sm text-stone-600">{{
+          copy.passwordPolicy
+        }}</span
+        ><span id="reset-password-error" class="error">{{ fieldError.password }}</span></label
+      >
       <button class="primary" type="submit" :disabled="busy">{{ copy.resetPasswordAction }}</button>
     </form>
 

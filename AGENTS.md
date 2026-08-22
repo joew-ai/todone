@@ -18,6 +18,10 @@
 - Do not change approved requirements silently.
 - Never commit secrets or production data.
 
+## Review feedback conventions
+
+- When the project owner leaves comments on a changeset, look for recurring feedback themes rather than treating each comment in isolation. Confirm any inferred trend with the project owner before acting on it, then add the confirmed convention as a stylistic guideline in this `AGENTS.md` file.
+
 ## Code conventions
 
 - Name stable cross-boundary values (API paths, header names, error codes, record kinds, field limits, and storage key formats) with constants or factories. Keep truly local literals local.

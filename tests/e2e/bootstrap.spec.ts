@@ -85,7 +85,7 @@ test('registers, verifies email, signs in, creates a household, and reaches onbo
   await page.getByLabel('Username').fill('ParentOne');
   await page.getByLabel('Recovery email').fill('parent@example.invalid');
   await page.getByLabel('Password', { exact: true }).fill('StrongPassword123!');
-  await page.getByLabel('Registration password').fill('synthetic-gate');
+  await page.getByLabel('Entry Code').fill('synthetic-gate');
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { name: 'Verify your recovery email' })).toBeVisible();
   await page.getByLabel('Verification code').fill('123456');
@@ -162,6 +162,36 @@ test('supports parent Forgot Password without account disclosure', async ({ page
   await page.getByLabel('New password').fill('NewStrongPassword123!');
   await page.getByRole('button', { name: 'Reset password' }).click();
   await expect(page.getByText('Password reset. Sign in with your new password.')).toBeVisible();
+});
+
+test('blocks a weak replacement password during recovery', async ({ page }) => {
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await page.getByLabel('Username').fill('ParentOne');
+  await page.getByRole('button', { name: 'Send recovery code' }).click();
+  await page.getByLabel('Recovery code').fill('123456');
+  const password = page.getByLabel('New password');
+  await password.fill('weak');
+  await page.getByRole('button', { name: 'Reset password' }).click();
+  await expect(page.locator('#reset-password-error')).toContainText('uppercase letter');
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAttribute('aria-invalid', 'true');
+});
+
+test('distinguishes the Entry Code and blocks a weak selected account password', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Create first-parent account' }).click();
+  await expect(page.getByLabel('Entry Code')).toBeVisible();
+  await expect(page.getByText('It is not your account password.')).toBeVisible();
+  await page.getByLabel('Username').fill('ParentOne');
+  await page.getByLabel('Recovery email').fill('parent@example.invalid');
+  const password = page.getByLabel('Password', { exact: true });
+  await password.fill('weak');
+  await page.getByLabel('Entry Code').fill('synthetic-gate');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.locator('#registration-password-error')).toContainText('uppercase letter');
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAttribute('aria-invalid', 'true');
 });
 
 test('requires a selectable timezone when browser detection is unavailable', async ({ page }) => {

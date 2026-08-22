@@ -7,11 +7,13 @@
 
 ## 2. Label Experience
 
-- [ ] 2.1 Extend parent Todo create/edit and completed history with accessible label suggestion, explicit inline creation, selection, and clearing; completion: loading, no-match, disabled, success, validation, cancellation, failure, and retry states work by keyboard.
-- [ ] 2.2 Add single-select active/history filters for parents and children, featuring a child's own-used labels above remaining household labels; completion: clear-filter restores the authorized default list and sibling-only filters return empty.
+- [ ] 2.1 Produce and review compact-first label suggestion/create/select/clear and active/history filter reference states using `visual-design-foundation`; completion: accepted hierarchy keeps labels secondary to Todo title/state, clearly distinguishes create from select, and covers long names, duplicates, no match, filtered empty, and materially different wide composition.
+- [ ] 2.2 Extend parent Todo create/edit and completed history with accessible label suggestion, explicit inline creation, selection, and clearing; completion: loading, no-match, disabled, success, validation, cancellation, failure, and retry states work by keyboard.
+- [ ] 2.3 Add single-select active/history filters for parents and children, featuring a child's own-used labels above remaining household labels; completion: clear-filter restores the authorized default list and sibling-only filters return empty.
 
 ## 3. Verification
 
 - [ ] 3.1 Add unit and integration tests for trimming, display-case preservation, case-folded duplicate rejection, max length, prefix suggestions, clear-label, active/completed/archive rules, filters, and tenant/role denial; completion: labels cannot cross households or broaden a child query.
 - [ ] 3.2 Add Playwright and accessibility tests for label selection, no-match creation, filters, and clear filters; completion: configured browser tests pass.
-- [ ] 3.3 Run format, lint, typecheck, unit tests, integration tests, build, Playwright, and accessibility checks; completion: all required checks pass.
+- [ ] 3.3 Capture and manually review label entry, suggestion, selection, duplicate, filtered, and filtered-empty states at compact, medium, wide, 320-pixel reflow, and 200-percent zoom; completion: text remains the primary label cue, dynamic focus is stable, and metadata does not overwhelm Todo actions.
+- [ ] 3.4 Run format, lint, typecheck, unit tests, integration tests, build, Playwright, and accessibility checks; completion: all required checks pass.

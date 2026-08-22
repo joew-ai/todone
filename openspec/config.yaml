@@ -66,6 +66,8 @@ rules:
     - Include deployment, migration, compatibility, and rollback strategy.
     - Compare meaningful alternatives and explain why they were rejected.
     - Use Mermaid sequence or flow diagrams for complex interactions.
+    - For every user-facing change, include a Visual and UX Direction section that applies the visual-design-foundation capability to realistic content and states.
+    - Record accepted hierarchy, responsive composition, interaction feedback, reduced-motion behavior, and progressive disclosure before final styling begins.
 
   tasks:
     - Organize work into independently verifiable vertical slices.
@@ -74,5 +76,7 @@ rules:
     - Include explicit formatter, lint, typecheck, test, build, and Playwright tasks.
     - Include documentation and telemetry changes where relevant.
     - Include security-negative and accessibility verification tasks.
+    - Put feature-level reference-state or mockup review before implementation of each substantial new UI surface.
+    - Include manual visual review of the implemented compact, medium, and wide surfaces plus 320-pixel reflow, 200-percent zoom, long content, focus, contrast, and reduced motion.
     - Avoid tasks larger than one focused coding session.
     - Do not use vague tasks such as "finish frontend" or "add remaining tests".

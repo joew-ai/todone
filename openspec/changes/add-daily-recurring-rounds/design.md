@@ -38,6 +38,15 @@ stateDiagram-v2
 - Reuse existing privacy-safe logs and free CloudWatch metrics. Do not provision paid alerting or monitoring resources for recurrence.
 - Extend the child-removal cascade with RecurrenceTemplate, generated Todo, recurrence-history, and associated audit-snapshot deletion before identity deletion and username release complete.
 
+## Visual and UX Direction
+
+- Extend `visual-design-foundation` and the accepted Todo-row/history anatomy. Generated Todos should look like ordinary current work with compact recurrence context; template management is a parent tool and must not create a visually separate child experience.
+- Explore daily-template list/create/edit/retire states, current generated work, missed/skipped/completed history, correction, detachment, generation failure, and retry before implementation. Use progressive disclosure for schedule and lifecycle explanation so the common title/assignee/label fields remain easy to scan.
+- Keep recurrence provenance and outcome as secondary text with consistent placement. `MISSED` and `SKIPPED` require explicit labels; the restrained red missed treatment is supplementary and never becomes a large alarming card.
+- Reopening or due-date editing should clearly explain that the Todo becomes ordinary active work without turning the row into a special exception design. Template retirement should read as future-facing and preserve visible history context.
+- Reuse the brief server-confirmed completion celebration for a current generated Todo only. Historical corrections, skips, retirement, rollover, and reconciliation use calm state feedback rather than confetti or glitter.
+- Review compact and wide compositions with long titles, schedule metadata, error/retry, chronological history, reduced motion, zoom/reflow, and keyboard/screen-reader use before completing the UI.
+
 ## Risks / Trade-offs
 
 - Scheduled execution may fail or run late; current-round reconciliation repairs present work, while accepted elapsed gaps remain absent from history.

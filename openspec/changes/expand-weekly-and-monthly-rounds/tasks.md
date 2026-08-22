@@ -8,12 +8,14 @@
 
 ## 2. Parent and Child Experience
 
-- [ ] 2.1 Add accessible weekly/monthly/frequency controls to routine management; completion: controls explain first-of-period generation, selected due dates, clamping, next-boundary activation, and future-only cadence changes by keyboard.
-- [ ] 2.2 Extend current and chronological history presentation with weekly/monthly context and all daily loading, empty, failure, retry, reduced-motion, Archive-as-skip, due/reopen detachment, missed warning, correction, deletion, and tenant protections; completion: rollover-bound old rounds remain historical while detached reopened rounds return to the default active list.
+- [ ] 2.1 Produce and review compact-first cadence reference states extending the accepted daily routine patterns, including frequency selection, weekday/month-day controls, clamping and boundary explanations, future-only edits, retirement, generation failure, and history context; completion: accepted hierarchy uses plain-language summaries and materially different wide composition without cadence-specific themes or colors.
+- [ ] 2.2 Add accessible weekly/monthly/frequency controls to routine management; completion: controls explain first-of-period generation, selected due dates, clamping, next-boundary activation, and future-only cadence changes by keyboard.
+- [ ] 2.3 Extend current and chronological history presentation with weekly/monthly context and all daily loading, empty, failure, retry, reduced-motion, Archive-as-skip, due/reopen detachment, missed warning, correction, deletion, and tenant protections; completion: rollover-bound old rounds remain historical while detached reopened rounds return to the default active list.
 
 ## 3. Verification
 
 - [ ] 3.1 Add unit and integration coverage for Sunday-start weeks, Sunday/year-month keys, mid-period creation, frequency changes, removal, current-only reconciliation, month lengths, clamp reset, leap years, DST boundaries, idempotency, isolation, Archive-as-skip, due/reopen detachment, correction, child-removal cascade for non-daily templates, and history access; completion: schedule edge cases are deterministic.
 - [ ] 3.2 Add Playwright and accessibility coverage for cadence creation/edit/removal, next-boundary messaging, generation failures, and historical views; completion: configured browsers and all responsive targets pass.
 - [ ] 3.3 Document and verify staged migration and rollback with existing daily templates; completion: rollback preserves daily behavior and generated Todo history.
-- [ ] 3.4 Run format, lint, typecheck, unit tests, integration tests, build, Playwright, and accessibility checks; completion: all required checks pass.
+- [ ] 3.4 Capture and manually review cadence creation/edit/removal, clamping, boundary, current/history, and failure states at compact, medium, wide, 320-pixel reflow, and 200-percent zoom; completion: schedule complexity remains progressively disclosed, text carries cadence meaning, and no calendar dashboard or decorative cadence treatment appears.
+- [ ] 3.5 Run format, lint, typecheck, unit tests, integration tests, build, Playwright, and accessibility checks; completion: all required checks pass.

@@ -82,6 +82,26 @@ interface EnglishMessages {
     retry: string;
   };
   householdRepository: { missingProfile: string };
+  familyClient: { sessionEnded: string; requestFailed: string };
+  familyManagement: {
+    heading: string;
+    loading: string;
+    loadFailed: string;
+    retry: string;
+    empty: string;
+    username: string;
+    role: string;
+    status: string;
+    parent: string;
+    child: string;
+    active: string;
+    pending: string;
+    editProfile: string;
+    saveProfile: string;
+    profileSaved: string;
+    cancel: string;
+    pendingActions: string;
+  };
 }
 
 export const messages = parse(rawEnglishCatalog) as EnglishMessages;

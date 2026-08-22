@@ -33,6 +33,13 @@ flowchart TD
 - Persist Cognito session material only in browser `sessionStorage`, sufficient to restore the current tab after reload. Do not use `localStorage`, IndexedDB, service-worker caches, URLs, or application data for tokens. Sign-out and session failure clear session storage and private rendered state.
 - Follow the foundation's canonical data-model, API, authorization, responsive-accessibility, interaction-state, and testing documents.
 
+## Visual and UX Direction
+
+- Treat registration, confirmation, sign-in, recovery, household creation, and onboarding as one calm sequence with a consistent warm reading surface and deep forest/plum orientation cues from `visual-design-foundation`; do not make each authentication state look like a separate product.
+- Keep the current step, page purpose, and primary action visually dominant. Entry Code, account credentials, recovery email, timezone, and household metadata remain plainly labelled but do not compete at the same emphasis.
+- Use contained forms with persistent labels, concise help, and stable error space rather than dense settings layouts. Preserve input and focus behavior already defined by the security and interaction contracts.
+- Onboarding should confirm progress and present the next useful action without celebration, illustration, or a dashboard of unavailable features. Existing delivered surfaces are brought under this direction by the visual-foundation change rather than retroactively marking new work complete here.
+
 ## Risks / Trade-offs
 
 - The deployment gate password is a reusable bootstrap control, not a household invitation or high-security access-control system. Anyone who knows it can create a separate household. Changing its configured hash rotates it; removing the hash closes registration.

@@ -14,6 +14,7 @@ const fetchCurrentMembership = vi.fn();
 const createHousehold = vi.fn();
 const fetchMyProfile = vi.fn();
 const saveMyProfile = vi.fn();
+const fetchFamilyMembers = vi.fn();
 
 vi.mock('../../config/authConfig', () => ({
   loadAuthConfig: () => ({ userPoolId: 'pool', clientId: 'client', region: 'us-east-1' }),
@@ -38,6 +39,7 @@ vi.mock('../../services/profileClient', () => ({
   ProfileColor: { pine: 'PINE', lake: 'LAKE' },
   ProfileColorHex: { PINE: '#2F6B4F', LAKE: '#337B8C' },
 }));
+vi.mock('../../services/familyClient', () => ({ fetchFamilyMembers }));
 
 const { default: ProductionBootstrap } = await import('../../components/ProductionBootstrap.vue');
 
@@ -57,6 +59,7 @@ describe('ProductionBootstrap', () => {
     restoreSession.mockResolvedValue(null);
     fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership: null } });
     fetchMyProfile.mockResolvedValue({ kind: 'success', data: { profile: null } });
+    fetchFamilyMembers.mockResolvedValue({ kind: 'success', data: { members: [] } });
     getIdToken.mockReturnValue('id-token');
   });
 
@@ -265,7 +268,7 @@ describe('ProductionBootstrap', () => {
       color: 'LAKE',
       version: 0,
     });
-    expect(wrapper.text()).toContain('Next, add your family members');
+    expect(wrapper.text()).toContain('Family management');
     wrapper.unmount();
   });
 
@@ -284,6 +287,53 @@ describe('ProductionBootstrap', () => {
     expect(wrapper.get('h2').text()).toBe('Set up your profile');
   });
 
+  it('renders the family directory and lets a member edit only their own profile', async () => {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership } });
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'member-one', displayName: 'River', color: 'PINE', version: 1 },
+      },
+    });
+    fetchFamilyMembers.mockResolvedValue({
+      kind: 'success',
+      data: {
+        members: [
+          {
+            memberId: 'member-one',
+            username: 'parent-one',
+            role: 'parent',
+            activationState: 'ACTIVE',
+            displayName: 'River',
+            color: 'PINE',
+            allowedActions: [],
+          },
+        ],
+      },
+    });
+    saveMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'member-one', displayName: 'River Two', color: 'LAKE', version: 2 },
+      },
+    });
+    const wrapper = mount(ProductionBootstrap);
+    await flushPromises();
+    expect(wrapper.text()).toContain('@parent-one');
+    await wrapper.get('button.secondary').trigger('click');
+    await wrapper.get('input[autocomplete="nickname"]').setValue('River Two');
+    await wrapper.get('input[value="LAKE"]').setValue();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(saveMyProfile).toHaveBeenCalledWith('id-token', {
+      displayName: 'River Two',
+      color: 'LAKE',
+      version: 1,
+    });
+    expect(wrapper.text()).toContain('Profile updated.');
+  });
+
   it('clears private rendered state on sign-out', async () => {
     restoreSession.mockResolvedValue({ idToken: 'token' });
     fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership } });
@@ -293,6 +343,7 @@ describe('ProductionBootstrap', () => {
         profile: { memberId: 'member-one', displayName: 'River', color: 'LAKE', version: 1 },
       },
     });
+    fetchFamilyMembers.mockResolvedValue({ kind: 'success', data: { members: [] } });
     const wrapper = mount(ProductionBootstrap);
     await flushPromises();
     expect(wrapper.text()).toContain('River House');

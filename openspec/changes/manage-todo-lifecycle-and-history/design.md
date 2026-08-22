@@ -32,6 +32,14 @@ stateDiagram-v2
 - Children receive history queries only for their own current assignee ID. They may undo only a completion they performed on a Todo still assigned to them.
 - Product deletion removes all user-visible projections and writes a restricted full audit snapshot containing the deleted Todo and completion metadata. Product APIs never expose this snapshot. Full child-account removal purges audit snapshots associated with that child.
 
+## Visual and UX Direction
+
+- Extend the accepted Todo-row anatomy from `visual-design-foundation` instead of creating a separate history theme. Explore active, completed, archived, overdue, conflict, and removed-item states with realistic actor/time and assignee metadata before implementation.
+- History should feel quieter than current work: status, actor, and time remain legible, while completed and archived rows use restrained contrast and no celebratory motion. A completed row briefly shown during active-list completion is transitional; durable completed records live in the role-authorized history surface.
+- Keep correction actions contextual and progressively disclosed. Reopen/undo and restore are available where eligible; archive is the normal reversible removal; product deletion remains visually separated, low-frequency, and behind a focused confirmation.
+- Preserve chronology as both visual and DOM order. Use spacing, section headings, and compact metadata rather than a card around every historical event.
+- Prototype and review empty, loading, filtered/role-scoped, conflict/already-changed, destructive confirmation, and error/retry states at compact and wide compositions before final styling. Verify focus after list removal/restoration, long content, reduced motion, zoom/reflow, and status contrast on the actual UI.
+
 ## Risks / Trade-offs
 
 - Product deletion conflicts with “keep history forever”; archive is surfaced as the default, deletion needs a confirmation dialog, and a restricted audit snapshot preserves operator accountability without remaining visible to the family.

@@ -93,4 +93,29 @@
     },
   'householdRepository':
     { 'missingProfile': 'Stored active household member is missing a profile.' },
+  'familyClient':
+    {
+      'sessionEnded': 'Your session ended. Sign in to continue.',
+      'requestFailed': 'We could not load your family. Try again.',
+    },
+  'familyManagement':
+    {
+      'heading': 'Family management',
+      'loading': 'Loading your family…',
+      'loadFailed': 'We could not load your family.',
+      'retry': 'Try again',
+      'empty': 'No family members are available yet.',
+      'username': 'Username',
+      'role': 'Role',
+      'status': 'Status',
+      'parent': 'Parent',
+      'child': 'Child',
+      'active': 'Active',
+      'pending': 'Pending activation',
+      'editProfile': 'Edit my profile',
+      'saveProfile': 'Save profile',
+      'profileSaved': 'Profile updated.',
+      'cancel': 'Cancel',
+      'pendingActions': 'Pending parent actions will be available after account delivery is implemented.',
+    },
 }

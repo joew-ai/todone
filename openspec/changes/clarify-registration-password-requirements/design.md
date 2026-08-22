@@ -10,6 +10,13 @@ First-parent registration currently presents the reusable deployment gate as a r
 - Replace hardcoded labels and authentication errors touched by the change with typed `src/i18n/en.yml` entries.
 - This change does not alter the Cognito password policy, registration-gate hash/validation contract, authentication flow, or infrastructure.
 
+## Visual and UX Direction
+
+- Use the shared `visual-design-foundation` form anatomy so Entry Code and account password are distinguishable by label, help placement, and grouping—not by color alone.
+- Present the password policy as compact persistent guidance adjacent to the account-password field. It should be easy to scan without turning registration or recovery into a security-settings dashboard.
+- Give errors stable inline space and one clear correction focus. Do not add animated strength meters, playful password scoring, or policy effects that interrupt entry.
+- When the visual foundation is applied to delivered authentication screens, preserve the existing typed copy, accessible associations, and security-safe generic failure behavior.
+
 ## Verification
 
 Test registration and recovery before submission and after password-policy rejection. Verify that Entry Code and account-password failures are visually and semantically distinct, correction focus is useful, and submitted values never appear in rendered errors, logs, URLs, storage assertions, or test diagnostics.

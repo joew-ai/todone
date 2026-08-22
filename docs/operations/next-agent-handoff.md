@@ -14,15 +14,11 @@
 
 ## Immediate follow-up
 
-Start `openspec/changes/clarify-registration-password-requirements/` before the next feature. It was logged after staging feedback:
-
-- Rename the reusable registration-gate field/error so users do not confuse it with their account password.
-- Explain Cognito account-password rules in the form and after validation failure: at least 8 characters, uppercase, lowercase, number, and symbol.
-- Keep failed gate messaging generic; never reveal or compare submitted/configured gate values.
+`clarify-registration-password-requirements` is complete. Before final styling or adding another substantial user-facing surface, implement `openspec/changes/establish-visual-design-foundation/`. It establishes the shared forest-at-dusk visual language, role-prioritized application shell, reference-state review, and brief server-confirmed completion feedback. It does not change the Todo active-list/history contract.
 
 ## Next dependency-ordered crawl work
 
-After that bugfix, the next feature change is `openspec/changes/manage-family-accounts/`, followed by `openspec/changes/complete-first-family-todo/`. Read the selected OpenSpec proposal, design, tasks, and capability spec before editing. Do not modify historical critique reports.
+`manage-family-accounts` and `centralize-authorization-capabilities` are active work. Backend/domain tasks may proceed according to their own dependency boundaries, but their remaining client surfaces use `visual-design-foundation` and must complete their feature-level reference-state review before final styling. `complete-first-family-todo` follows family accounts and is the first full validation of the shared Todo row and completion interaction. Read the selected OpenSpec proposal, design, tasks, and capability spec before editing. Do not modify historical critique reports.
 
 ## Important implementation boundaries
 

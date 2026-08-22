@@ -18,6 +18,14 @@ Daily recurrence has established template/generated-Todo, timezone, server gener
 - Inherit Archive-as-`SKIPPED`, due-date edit and completed-reopen rollover detachment, and chronological `MISSED` text/restrained warning behavior without adding a trends surface.
 - Keep server generation independent of login and use conditional writes on template plus period key.
 
+## Visual and UX Direction
+
+- Extend the accepted daily-template and generated-Todo patterns from `visual-design-foundation`; cadence choice should add progressive schedule fields, not create separate daily, weekly, and monthly visual systems.
+- Explore frequency selection, weekly weekday, monthly day/clamping explanation, next-boundary activation, future-only edits, retirement, generation failure, and history context before implementation.
+- Show the schedule summary in plain language close to the affected controls and in compact secondary metadata on generated work. Explain short-month clamping and next-period activation when relevant without placing permanent instructional paragraphs on every template row.
+- Keep cadence and missed/skipped outcomes readable through text and stable hierarchy. Do not add calendar dashboards, charts, trends, decorative day illustrations, or cadence-specific colors.
+- Review month-length, leap-year, boundary, frequency-change, loading/error/retry, reduced-motion, long-content, 320-pixel reflow, 200-percent zoom, and compact/medium/wide compositions on the implemented UI before completion.
+
 ## Risks / Trade-offs
 
 - Monthly clamping means a “31st” schedule occurs on different numerical days; it is more predictable than missing a month and is explicitly visible in the UI.

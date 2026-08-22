@@ -18,6 +18,14 @@ Todos already support parent editing and role-scoped views. Labels introduce hou
 - Return all household labels as child filter options, compute labels used on that child's Todos so the client can feature them, and apply the selected single filter only after role-scoped Todo authorization.
 - Render text label names as the primary indicator; optional styling is supplementary.
 
+## Visual and UX Direction
+
+- Reuse the form, Todo-row, metadata, and filter patterns from `visual-design-foundation`. Explore label suggestion, explicit creation, duplicate resolution, selection, clearing, filtered results, and filtered-empty states before implementation.
+- Keep a Todo's label as compact secondary text rather than a dominant colored chip. Label names remain the primary cue; any tonal treatment is quiet, semantic-token-based, and never competes with due or completion state.
+- Use one clearly labelled single-select filter with a visible clear action. Feature labels used by the current child through order and text, not through oversized or uniquely colored controls.
+- Keep create-versus-select wording unmistakable in the suggestion surface and preserve keyboard focus as results change. A no-match state should invite explicit creation only for authorized parents.
+- Review long label names, duplicate/case variants, no matches, filtered empty, loading/failure/retry, and all responsive targets on the implemented UI before completion.
+
 ## Risks / Trade-offs
 
 - One label avoids multi-label query complexity but may be insufficient later; the model retains a label entity to allow a future expansion.

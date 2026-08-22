@@ -49,6 +49,15 @@ sequenceDiagram
 - Do not retain historical identity snapshots for a removed child because downstream capabilities must delete that child's associated history. Existing records for active members resolve current display name and color from the profile.
 - Follow the shared authorization matrix, data/access-pattern, interaction-state, and operations documents established by the foundation.
 
+## Visual and UX Direction
+
+- Apply `visual-design-foundation` before final family-management styling. Explore the compact family directory, first-parent profile setup, child creation, pending-parent state, and self-profile editing with realistic long names, usernames, role/state metadata, and authorized actions.
+- Keep member identity warm but restrained: name is primary, canonical profile color is a compact supporting cue, and username/role/state form a consistent metadata line. Do not introduce avatars, animals, illustrated identities, or profile-color-filled cards.
+- Use progressive disclosure for administrative complexity. The directory shows common actions and current state; password reset, recovery email, resend/change/cancel, and destructive removal open focused forms or confirmations instead of expanding every row into a settings panel.
+- Preserve a prominent route from the parent shell to Todo creation once that capability exists. Family management remains reachable but must not become the default parent home solely because it contains more controls.
+- Review pending, active, provisioning, partial-failure, session-cutoff, and destructive-confirmation compositions before implementation. Deep forest/plum anchors and warm surfaces should organize the density without using status color as the only signal.
+- Perform visual review on actual UI and the branded welcome email. Verify long-content wrapping, keyboard/focus order, 320-pixel reflow, 200-percent zoom, reduced motion, and every palette/text combination before completing the feature UI.
+
 ## Risks / Trade-offs
 
 - The runtime needs privileged Cognito operations; IAM must scope actions to the Todone user pool and all authorization occurs before calling Cognito.

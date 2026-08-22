@@ -23,6 +23,7 @@ import {
   CreateUserPoolCommand,
   ListUserPoolClientsCommand,
   ListUserPoolsCommand,
+  UpdateUserPoolCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 const LOCAL_ENDPOINT = process.env.COGNITO_LOCAL_ENDPOINT ?? 'http://localhost:9229';
@@ -44,6 +45,7 @@ async function main(): Promise<void> {
   });
 
   const userPoolId = await getOrCreateUserPool(client);
+  await enableLocalEmailVerification(client, userPoolId);
   const clientId = await getOrCreateAppClient(client, userPoolId);
   await upsertVerificationAccount(client, userPoolId, username, password);
   writeLocalEnv({ userPoolId, clientId });
@@ -75,6 +77,10 @@ async function getOrCreateUserPool(client: CognitoIdentityProviderClient): Promi
       // Mirrors the replacement production pool: plain, case-insensitive,
       // immutable usernames (ADR 0002); no email/phone requirement.
       UsernameConfiguration: { CaseSensitive: false },
+      // Cognito Local writes verification codes for these attributes to its
+      // console. Without this, SignUp creates an unconfirmed user but has no
+      // delivery channel and therefore no code to enter in the local UI.
+      AutoVerifiedAttributes: ['email'],
       Policies: {
         PasswordPolicy: {
           MinimumLength: 8,
@@ -91,6 +97,19 @@ async function getOrCreateUserPool(client: CognitoIdentityProviderClient): Promi
     throw new Error('cognito-local did not return a user pool ID.');
   }
   return created.UserPool.Id;
+}
+
+/** Applies email-code delivery to a pool created by an earlier setup run. */
+async function enableLocalEmailVerification(
+  client: CognitoIdentityProviderClient,
+  userPoolId: string,
+): Promise<void> {
+  await client.send(
+    new UpdateUserPoolCommand({
+      UserPoolId: userPoolId,
+      AutoVerifiedAttributes: ['email'],
+    }),
+  );
 }
 
 async function getOrCreateAppClient(

@@ -21,6 +21,7 @@
     "test:e2e": "playwright test tests/e2e",
     "test:e2e:local-auth": "playwright test tests/local-e2e",
     "test:a11y": "playwright test tests/a11y",
+    "verify-local": "npm run format:check && npm run lint:check && npm run typecheck && npm run test:unit && npm run test:integration && npm run build && npm run build:lambdas && npx openspec validate --all --strict --no-interactive",
     "setup:local-cognito": "tsx scripts/setup-local-cognito.ts",
     "build:lambdas": "tsx scripts/build-and-deploy-lambdas.ts --build-only",
     "deploy:lambdas": "tsx scripts/build-and-deploy-lambdas.ts",

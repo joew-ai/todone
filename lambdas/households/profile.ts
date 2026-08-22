@@ -14,7 +14,7 @@ import { HouseholdErrorCode } from './constants';
 import { validateProfileInput } from './familyValidation';
 import type { HouseholdRepository } from './model';
 import { getHouseholdRepository } from './runtime';
-import { messages } from '../../src/i18n/messages';
+import { messages } from '../shared/messages';
 
 const PROFILE_ROUTE = '/api/v1/profiles/me';
 

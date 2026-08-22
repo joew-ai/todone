@@ -82,6 +82,29 @@ The application SHALL provide parents a responsive family-management view listin
 - **WHEN** a parent opens family management
 - **THEN** every active household member and pending parent appears with only the actions allowed for that role and activation state
 
+### Requirement: Route-Backed Account Navigation
+Authentication, household/profile onboarding, self-profile, security, family-management, and member-creation page surfaces SHALL use canonical client-side routes whose URLs identify the current safe surface. Ordinary user navigation SHALL create browser history entries; automatic guard and normalization redirects SHALL replace the current entry. Browser Back, Forward, reload, and direct navigation SHALL restore the authorized surface without replaying writes or restoring secret input. Credentials, Entry Codes, verification/setup/recovery codes, tokens, email addresses, and usernames SHALL NOT appear in paths, query strings, fragments, or persisted history state.
+
+#### Scenario: Member navigates between account surfaces
+- **WHEN** a member navigates from family management to self-profile editing and then uses browser Back
+- **THEN** the URL changes for each surface and Back returns to family management without discarding confirmed server state or submitting either surface
+
+#### Scenario: Member reloads a protected route
+- **WHEN** an authenticated member reloads or directly visits a protected canonical route
+- **THEN** the application restores the session, resolves Membership/onboarding authorization, and renders that route or replaces it with the required safe prerequisite route
+
+#### Scenario: Signed-out visitor opens a protected route
+- **WHEN** a signed-out visitor opens a protected canonical route
+- **THEN** the application replaces it with sign-in without rendering private data and may retain only a non-secret authorized return destination in current-tab state
+
+#### Scenario: Visitor opens a secret-bearing flow
+- **WHEN** a visitor opens email verification, password reset, or additional-parent activation
+- **THEN** the URL identifies only the flow and the visitor supplies username and codes in current in-memory form fields rather than through the URL or persisted history state
+
+#### Scenario: History traverses a submitted form
+- **WHEN** a user traverses Back or Forward across a route whose form was previously submitted
+- **THEN** navigation performs no API mutation, does not restore secret fields, and shows only state confirmed by a fresh or retained authorized read
+
 ### Requirement: Administrative Provisioning Boundary
 Public first-parent signup SHALL require the Entry Code only for Cognito `PreSignUp_SignUp`. Parent-provisioned child and additional-parent creation SHALL use IAM-authorized `AdminCreateUser`, SHALL pass parent and household authorization before the Cognito call, and SHALL be restricted by IAM to the Todone user pool. The pre-signup trigger SHALL explicitly permit `PreSignUp_AdminCreateUser` without an Entry Code and reject unexpected trigger sources. Administrative creation SHALL NOT assume or require a prior public signup event.
 

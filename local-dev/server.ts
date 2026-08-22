@@ -82,7 +82,7 @@ app.put('/api/v1/profiles/me', async (req, res) => {
   );
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Todone local API simulator running on http://localhost:${PORT}`);
   console.log('Endpoints:');
   console.log('  GET /api/v1/health');
@@ -93,3 +93,17 @@ app.listen(PORT, () => {
   console.log('  PUT /api/v1/profiles/me');
   console.log('  GET /api/v1/family-members');
 });
+
+// tsx currently lets this module exit after the Express listener is initialized.
+// Keep one deliberate timer handle open under `concurrently`, then release it
+// after closing the listener when the parent development process stops.
+const keepAlive = setInterval(() => undefined, 60 * 60 * 1000);
+let isClosing = false;
+const closeServer = () => {
+  if (isClosing) return;
+  isClosing = true;
+  server.close(() => clearInterval(keepAlive));
+};
+
+process.once('SIGINT', closeServer);
+process.once('SIGTERM', closeServer);

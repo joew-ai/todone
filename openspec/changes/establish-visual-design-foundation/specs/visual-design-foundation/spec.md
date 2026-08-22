@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Mature Nature-Inspired Visual Language
-Todone SHALL use one light-only, nature-inspired visual language built from warm readable content surfaces and restrained deep forest, plum, clay, and related accents. The visual language SHALL define centralized semantic tokens for color, typography, spacing, shape, elevation, iconography, focus, disabled, status, and motion states. It SHALL feel appropriate to adolescents and adults and SHALL NOT introduce mascots, animals, illustrated task animations, emoji decoration, points, streaks, rewards, sound, or vibration.
+Todone SHALL use one light-only, nature-inspired visual language built from deep forest anchors, profile-derived tonal personal surfaces, warm readable form/settings surfaces, and stable semantic state colors. The visual language SHALL define centralized tokens for color, typography, spacing, shape, elevation, iconography, focus, disabled, status, and motion states plus accessible tonal families for every canonical profile color. It SHALL feel appropriate to adolescents and adults and SHALL NOT introduce mascots, animals, illustrated task objects, emoji decoration, points, streaks, rewards, rare/jackpot outcomes, sound, or vibration.
 
 #### Scenario: Dense family surface uses the shared language
 - **WHEN** a family-management or Todo surface presents primary actions with supporting metadata
@@ -11,8 +11,16 @@ Todone SHALL use one light-only, nature-inspired visual language built from warm
 - **WHEN** color, weight, elevation, or motion reinforces identity, status, selection, success, warning, or error
 - **THEN** visible text or semantics communicates the same meaning and the actual combination meets the applicable WCAG 2.2 AA requirement
 
+#### Scenario: Member changes profile color
+- **WHEN** a member selects another canonical profile color
+- **THEN** their personal header and Todo canvas use the corresponding contrast-checked tonal family while actions, warnings, errors, lifecycle states, and accessible identity text retain their established meaning
+
+#### Scenario: Header artwork is considered
+- **WHEN** a design iteration proposes nature artwork beyond the default profile-to-forest gradient
+- **THEN** the artwork is static, supplementary, visually reviewed at production quality, and omitted when it would read as generic clip art, childish identity imagery, or essential content
+
 ### Requirement: System-Compatible Typography and Components
-Todone SHALL use a system-first sans-serif font stack that remains legible and structurally consistent across supported laptop, iPhone, and iPad browsers without requiring a remote font. Shared components SHALL use generous touch targets, restrained rounded geometry and elevation, consistent outline icons, and responsive content hierarchy without clipping long family or Todo content.
+Todone SHALL use a system-first sans-serif font stack that remains legible and structurally consistent across supported laptop, iPhone, and iPad browsers without requiring a remote font. Shared components SHALL use generous touch targets, restrained rounded geometry/elevation for genuinely bounded controls and surfaces, consistent outline icons, and responsive content hierarchy without clipping long family or Todo content. Active Todo lists SHALL present full-bleed continuous rows rather than a stack of individually floating cards.
 
 #### Scenario: Preferred font is unavailable
 - **WHEN** a device renders Todone using a fallback system font
@@ -30,7 +38,7 @@ The signed-in application shell SHALL prioritize assigned active Todos and compl
 - **THEN** a prominent labelled path to create and assign a Todo is available without navigating through account settings
 
 ### Requirement: Rewarding Server-Confirmed Completion Feedback
-Todo completion feedback SHALL begin its celebratory phase only after the server confirms success. The confirmed interaction SHALL provide a brief, local pop and optional abstract light-particle or glitter treatment, resolve the row to an explicitly completed lower-emphasis appearance, and remove it from the active list within a few seconds. It SHALL NOT use sound, vibration, illustration, rewards, or motion that blocks the next action. A visible labelled control SHALL remain available even if supplementary swipe completion is implemented.
+Todo completion feedback SHALL begin its celebratory phase only after the server confirms success. The confirmed interaction SHALL provide a brief, local pop and one of a small reviewed family of equally prominent nature-inspired light/shape/motion treatments, resolve the row to an explicitly completed lower-emphasis appearance, and remove it from the active list within a few seconds. The client SHALL select the effect by hashing the stable Todo ID into the approved effect list so retry/reopen behavior is deterministic without persisted reward state. Selection SHALL NOT assign, communicate, collect, or reward rarity. Feedback SHALL NOT use sound, vibration, emoji, scores, streaks, or motion that blocks the next action. A visible labelled control SHALL remain available even if supplementary swipe completion is implemented.
 
 #### Scenario: Completion succeeds
 - **WHEN** the server confirms that an authorized actor completed an active Todo
@@ -43,6 +51,10 @@ Todo completion feedback SHALL begin its celebratory phase only after the server
 #### Scenario: Reduced motion is requested
 - **WHEN** the user prefers reduced motion and completion succeeds
 - **THEN** particles, glitter, translation, scaling, and animated collapse are omitted while the same completion state, announcement, removal, and focus outcome remain available
+
+#### Scenario: Rich completion effect runs
+- **WHEN** an accepted nature-inspired completion effect runs on a supported device
+- **THEN** it does not delay input, focus, scrolling, confirmed-state presentation, or row removal and its complexity is adjusted when measured browser behavior shows visible jank or long main-thread work
 
 ### Requirement: Incremental Design Review
 Every change that introduces or materially alters a user-facing surface SHALL include design exploration before final styling and visual review before the change is complete. Exploration SHALL cover the primary compact state, materially different responsive compositions, realistic metadata, and applicable loading, empty, error, success, disabled, conflict, and destructive states. Review SHALL include real implementation screenshots, keyboard/focus behavior, contrast, reduced motion, 320-pixel reflow, and 200-percent zoom.

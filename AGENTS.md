@@ -25,15 +25,39 @@
 ## Code conventions
 
 - Name stable cross-boundary values (API paths, header names, error codes, record kinds, field limits, and storage key formats) with constants or factories. Keep truly local literals local.
-- Keep user-visible frontend copy in src/i18n/en.yml; API messages must be generic domain messages, not instructions tied to a particular UI.
 - Prefer explicit control flow over conditional return expressions when the condition carries authorization or state meaning.
-- Keep user-visible strings and stable external error identifiers in centralized catalogs or named constants.
-- Put every human-readable message, including invariant and internal-failure messages, in `src/i18n/en.yml`; do not introduce inline prose strings in application or Lambda code.
+- Put user-facing frontend copy, generic API domain messages, and stable external error identifiers in `src/i18n/en.yml` or another centralized external contract catalog. Keep internal diagnostics as named local constants or stable internal error codes; never return or log them raw to users.
 - Reuse shared HTTP status/response and authenticated-request helpers rather than defining endpoint-specific response plumbing.
 - When a constant serves one small code region, define it as near to that region as practical without recreating it repeatedly.
 - Reuse shared request, response, repository, and validation utilities when they preserve an established contract. Record request IDs and outcomes for successful as well as failed API requests.
 - Prefer descriptive helper names over terse persistence or serialization abbreviations.
 - Treat sign-out as a fail-safe local privacy boundary: clear local credentials and private UI state even if an SDK cleanup call throws. Add server sign-out only when a server-side sign-out contract exists.
+
+## OpenSpec implementation workflow
+
+- At the beginning and end of each implementation slice, reconcile the active OpenSpec checklist. Report completed, remaining, blocked, and intentionally deferred tasks explicitly.
+- Do not describe a change as ready for review while unfinished tasks remain unless those tasks are clearly identified as externally blocked or deferred with the project owner's approval.
+- When implementation reveals missing product behavior, update the proposal, design, requirements, and task list before implementing the new behavior.
+
+## Manual testing handoff
+
+- Before asking the project owner to perform hands-on testing, run the same documented startup commands and exercise the critical flow with an automated browser smoke where possible.
+- Local emulators must enforce security-sensitive behavior or clearly identify unsupported parity. Never silently allow a local security gate to be bypassed.
+- Testing instructions must state expected outcomes and distinguish automated, locally verified, and human-only checks.
+
+## Browser navigation
+
+- Page-level application surfaces require canonical URLs and must preserve browser Back, Forward, reload, and safe deep-link behavior.
+- Credentials, codes, tokens, emails, usernames, and mutation payloads must not enter URLs or persisted history state.
+
+## External-service boundaries
+
+- Add concise function-level comments where Cognito, API Gateway, Lambda triggers, or another external service supplies an event and expects a particular response or ordering contract.
+
+## Approved local command families
+
+- The project owner authorizes Codex to run every current `npm run test*`, `npm run dev*`, and `npm run build*` script, `npm run verify-local`, and every `npx playwright` command without asking again.
+- This section documents owner intent. `.codex/rules/default.rules` is the executable permission policy and deliberately enumerates npm scripts so deployment commands are not allowed accidentally.
 
 ## Required workflow
 
@@ -84,6 +108,7 @@
 
 ## Test workflow
 
+- Run the aggregate non-browser verification suite with `npm run verify-local`.
 - Run the required checks with `npm run format:check`, `npm run lint:check`, `npm run typecheck`, `npm run test:unit`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, and `npm run test:a11y`.
 - Run one Playwright file with `npx playwright test tests/e2e/<file>.spec.ts`; target a configured project with `--project=<project-name>` from `playwright.config.ts`.
 - End-to-end and accessibility suites run against the local application in Chromium, Firefox, and WebKit at the configured compact, medium, and wide viewports. CI rejects `test.only`.

@@ -19,6 +19,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -99,11 +100,14 @@ async function buildLambda(name: string): Promise<BuildResult> {
   // Lambda runtime's default resolution would otherwise infer.
   const packagePath = join(outDir, 'package.json');
   writeFileSync(packagePath, JSON.stringify({ type: 'commonjs' }) + '\n');
+  const catalogPath = join(outDir, 'en.yml');
+  copyFileSync(join(process.cwd(), 'src', 'i18n', 'en.yml'), catalogPath);
   // `zip` (not a new dependency) keeps the artifact reproducible without
   // adding an archiving library for one build step.
   utimesSync(outfile, REPRODUCIBLE_ZIP_TIME, REPRODUCIBLE_ZIP_TIME);
   utimesSync(packagePath, REPRODUCIBLE_ZIP_TIME, REPRODUCIBLE_ZIP_TIME);
-  execFileSync('zip', ['-qX', zipPath, 'index.js', 'package.json'], { cwd: outDir });
+  utimesSync(catalogPath, REPRODUCIBLE_ZIP_TIME, REPRODUCIBLE_ZIP_TIME);
+  execFileSync('zip', ['-qX', zipPath, 'index.js', 'package.json', 'en.yml'], { cwd: outDir });
 
   const bytes = readFileSync(zipPath);
   const sha256 = createHash('sha256').update(bytes).digest('hex');

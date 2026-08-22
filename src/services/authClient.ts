@@ -108,6 +108,9 @@ export class AuthClient {
   }
 
   async confirmRegistration(username: string, code: string): Promise<AuthActionResult> {
+    if (this.config.localEndpoint) {
+      return this.confirmRegistrationLocal(username, code);
+    }
     return new Promise((resolve) => {
       this.user(username).confirmRegistration(code, true, (error) =>
         resolve(error ? confirmationError(error) : { kind: 'success' }),
@@ -116,6 +119,9 @@ export class AuthClient {
   }
 
   async resendConfirmationCode(username: string): Promise<AuthActionResult> {
+    if (this.config.localEndpoint) {
+      return this.resendConfirmationCodeLocal(username);
+    }
     return new Promise((resolve) => {
       this.user(username).resendConfirmationCode((error) =>
         resolve(error ? confirmationError(error) : { kind: 'success' }),
@@ -124,6 +130,9 @@ export class AuthClient {
   }
 
   async forgotPassword(username: string): Promise<AuthActionResult> {
+    if (this.config.localEndpoint) {
+      return this.forgotPasswordLocal(username);
+    }
     return new Promise((resolve) => {
       this.user(username).forgotPassword({
         inputVerificationCode: () => resolve({ kind: 'success' }),
@@ -145,6 +154,9 @@ export class AuthClient {
     code: string,
     newPassword: string,
   ): Promise<AuthActionResult> {
+    if (this.config.localEndpoint) {
+      return this.confirmForgotPasswordLocal(username, code, newPassword);
+    }
     return new Promise((resolve) => {
       this.user(username).confirmPassword(code, newPassword, {
         onSuccess: () => resolve({ kind: 'success' }),
@@ -236,13 +248,8 @@ export class AuthClient {
     email: string,
     registrationGatePassword: string,
   ): Promise<AuthActionResult> {
-    const { CognitoIdentityProviderClient, SignUpCommand } =
-      await import('@aws-sdk/client-cognito-identity-provider');
-    const client = new CognitoIdentityProviderClient({
-      region: this.config.region,
-      endpoint: this.config.localEndpoint,
-      credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
-    });
+    const { SignUpCommand } = await import('@aws-sdk/client-cognito-identity-provider');
+    const client = await this.localCognitoClient();
     try {
       await client.send(
         new SignUpCommand({
@@ -262,14 +269,8 @@ export class AuthClient {
   private async signInLocal(username: string, password: string): Promise<SignInResult> {
     // Dynamically imported so this heavier SDK client never lands in the
     // production bundle for the (default) SRP path.
-    const { CognitoIdentityProviderClient, InitiateAuthCommand } =
-      await import('@aws-sdk/client-cognito-identity-provider');
-
-    const client = new CognitoIdentityProviderClient({
-      region: this.config.region,
-      endpoint: this.config.localEndpoint,
-      credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
-    });
+    const { InitiateAuthCommand } = await import('@aws-sdk/client-cognito-identity-provider');
+    const client = await this.localCognitoClient();
 
     try {
       const response = await client.send(
@@ -300,6 +301,89 @@ export class AuthClient {
     } catch (err) {
       return { kind: 'error', ...mapAuthError(err) };
     }
+  }
+
+  /** Cognito Local does not support the browser SDK's default AWS endpoint. */
+  private async confirmRegistrationLocal(
+    username: string,
+    code: string,
+  ): Promise<AuthActionResult> {
+    const { ConfirmSignUpCommand } = await import('@aws-sdk/client-cognito-identity-provider');
+    const client = await this.localCognitoClient();
+    try {
+      await client.send(
+        new ConfirmSignUpCommand({
+          ClientId: this.config.clientId,
+          Username: username,
+          ConfirmationCode: code,
+        }),
+      );
+      return { kind: 'success' };
+    } catch (error) {
+      return confirmationError(error);
+    }
+  }
+
+  private async resendConfirmationCodeLocal(username: string): Promise<AuthActionResult> {
+    const { ResendConfirmationCodeCommand } =
+      await import('@aws-sdk/client-cognito-identity-provider');
+    const client = await this.localCognitoClient();
+    try {
+      await client.send(
+        new ResendConfirmationCodeCommand({ ClientId: this.config.clientId, Username: username }),
+      );
+      return { kind: 'success' };
+    } catch (error) {
+      return confirmationError(error);
+    }
+  }
+
+  private async forgotPasswordLocal(username: string): Promise<AuthActionResult> {
+    const { ForgotPasswordCommand } = await import('@aws-sdk/client-cognito-identity-provider');
+    const client = await this.localCognitoClient();
+    try {
+      await client.send(
+        new ForgotPasswordCommand({ ClientId: this.config.clientId, Username: username }),
+      );
+      return { kind: 'success' };
+    } catch (error) {
+      return getErrorCode(error) === 'UserNotFoundException'
+        ? { kind: 'success' }
+        : { kind: 'error', ...mapAuthError(error) };
+    }
+  }
+
+  private async confirmForgotPasswordLocal(
+    username: string,
+    code: string,
+    newPassword: string,
+  ): Promise<AuthActionResult> {
+    const { ConfirmForgotPasswordCommand } =
+      await import('@aws-sdk/client-cognito-identity-provider');
+    const client = await this.localCognitoClient();
+    try {
+      await client.send(
+        new ConfirmForgotPasswordCommand({
+          ClientId: this.config.clientId,
+          Username: username,
+          ConfirmationCode: code,
+          Password: newPassword,
+        }),
+      );
+      return { kind: 'success' };
+    } catch (error) {
+      return passwordResetError(error);
+    }
+  }
+
+  private async localCognitoClient() {
+    const { CognitoIdentityProviderClient } =
+      await import('@aws-sdk/client-cognito-identity-provider');
+    return new CognitoIdentityProviderClient({
+      region: this.config.region,
+      endpoint: this.config.localEndpoint,
+      credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
+    });
   }
 
   private restoreLocalSession(): AuthSession | null {

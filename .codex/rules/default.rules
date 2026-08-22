@@ -1,0 +1,75 @@
+# Project-local command approvals. Codex rules match exact argument prefixes,
+# so script families are enumerated to avoid also allowing deployment scripts.
+prefix_rule(
+    pattern = [
+        "npm",
+        "run",
+        [
+            "test:unit",
+            "test:unit:watch",
+            "test:integration",
+            "test:e2e",
+            "test:e2e:local-auth",
+            "test:a11y",
+        ],
+    ],
+    decision = "allow",
+    justification = "The project owner approved every current npm test script.",
+    match = [
+        "npm run test:unit",
+        "npm run test:unit -- --run src/test/services/authClient.test.ts",
+        "npm run test:e2e:local-auth",
+    ],
+    not_match = [
+        "npm run deploy:lambdas",
+        "npm run setup:local-cognito",
+    ],
+)
+
+prefix_rule(
+    pattern = ["npm", "run", ["dev", "dev:api", "dev:cognito", "dev:full"]],
+    decision = "allow",
+    justification = "The project owner approved every current npm development script.",
+    match = [
+        "npm run dev",
+        "npm run dev:full",
+    ],
+    not_match = [
+        "npm run deploy:frontend",
+        "npm run setup:local-cognito",
+    ],
+)
+
+prefix_rule(
+    pattern = ["npm", "run", ["build", "build:lambdas"]],
+    decision = "allow",
+    justification = "The project owner approved every current npm build script.",
+    match = [
+        "npm run build",
+        "npm run build:lambdas",
+    ],
+    not_match = [
+        "npm run deploy:lambdas",
+        "npm run deploy:frontend",
+    ],
+)
+
+prefix_rule(
+    pattern = ["npm", "run", "verify-local"],
+    decision = "allow",
+    justification = "The project owner approved the aggregate local verification script.",
+)
+
+prefix_rule(
+    pattern = ["npx", "playwright"],
+    decision = "allow",
+    justification = "The project owner approved all npx Playwright commands.",
+    match = [
+        "npx playwright test",
+        "npx playwright test tests/e2e/bootstrap.spec.ts --project=chromium",
+        "npx playwright show-report",
+    ],
+    not_match = [
+        "npx openspec validate --all --strict",
+    ],
+)

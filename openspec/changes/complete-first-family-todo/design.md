@@ -35,11 +35,12 @@ sequenceDiagram
 ## Visual and UX Direction
 
 - Use the child active list and parent member list as the first feature-level validation of `visual-design-foundation`. Create compact reference states before implementation for populated, empty, loading, overdue, submitting, completion-success, failure/retry, and already-changed outcomes, then verify materially different medium/wide composition.
-- Make a child's Todo title and completion control the strongest repeated elements. Due status is secondary but explicit; labels and recurrence are not present in this slice. Avoid illustrated task icons, emoji decoration, rewards, and card chrome that makes each short Todo feel like a dashboard tile.
+- Make a child's Todo title and completion control the strongest repeated elements on a full-bleed list canvas whose accessible tonal surfaces derive from the signed-in member's profile color. Due status is secondary but explicit; labels and recurrence are not present in this slice. Avoid illustrated task icons, emoji decoration, rewards, and card chrome that makes each short Todo feel like a dashboard tile.
 - Keep a prominent labelled create-Todo path in the parent shell and make assignee selection clear through visible name plus profile color. The creation form should feel focused even as later optional fields are added.
-- On activation, the completion control may show immediate pressed/busy feedback while the row remains semantically active. Only after server confirmation should it pop, emit a short abstract light-particle/glitter treatment, resolve briefly to an explicit lower-emphasis completed appearance, and collapse out of the active list within a few seconds.
+- On activation, the completion control may show immediate pressed/busy feedback while the row remains semantically active. Only after server confirmation should it pop, play one equally prominent nature treatment selected by hashing the stable Todo ID into the approved effect list, resolve briefly to an explicit lower-emphasis completed appearance, and collapse out of the active list within a few seconds. Do not introduce rare/jackpot outcomes or collection language.
 - Completion uses no sound or vibration. Any swipe gesture is supplementary to a visible labelled control. Reduced motion removes pop, particles, translation, and animated collapse while preserving the announcement, removal, and next-focus behavior.
 - Review real screenshots and motion at every responsive target, 320-pixel reflow, 200-percent zoom, and with long titles/names before completing the UI. Motion timing tests should assert a documented upper bound and outcomes, not brittle animation frames.
+- Review motion on representative supported mobile and laptop browsers. Prefer composited transforms/opacity, but retain richer SVG/CSS effects when measured scrolling, input, focus, confirmed-state presentation, and removal remain responsive.
 
 ## Risks / Trade-offs
 

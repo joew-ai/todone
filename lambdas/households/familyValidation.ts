@@ -9,7 +9,7 @@ import {
   USERNAME_PATTERN,
 } from './constants';
 import type { ApiFieldError } from '../shared/responses';
-import { messages } from '../../src/i18n/messages';
+import { messages } from '../shared/messages';
 
 // Unicode General Category Cc matches invisible control characters, which do not belong in names.
 const CONTROL_CHARACTER_PATTERN = /\p{Cc}/u;

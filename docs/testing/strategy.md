@@ -57,6 +57,8 @@ npm run dev:full
 
 Open `http://localhost:3000`, enter the local development account, and confirm the production sign-in flow reaches household creation or the existing household landing. `cognito-local` supports `USER_PASSWORD_AUTH`, not SRP, so `AuthClient` uses that flow only when `VITE_COGNITO_LOCAL_ENDPOINT` is explicitly present. The ordinary deployed configuration continues to use Cognito SRP. Local JWT verification fetches the local emulator JWKS and caches it; production verification continues to validate the real Cognito issuer, audience, token use, and JWKS.
 
+`cognito-local` does not execute Todone's deployed pre-signup Lambda. Its browser registration path therefore cannot prove Entry Code enforcement and MUST NOT be treated as that security test; the pure pre-signup unit tests and an explicitly authorized production smoke own that evidence. The emulator does write confirmation and recovery codes to its console once local pool setup enables email verification. Local confirmation, resend, and recovery flows use the emulator's raw Cognito API endpoint rather than the browser SDK's production endpoint.
+
 To reset local identities, stop the emulator, delete `.cognito/db/`, delete `.env.local`, and repeat the bootstrap steps. This deletes synthetic local data only.
 
 ## Test layers

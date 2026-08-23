@@ -490,13 +490,11 @@ async function focusFirstField(): Promise<void> {
           class="field"
           :aria-invalid="!!fieldError.password"
           aria-describedby="registration-password-policy registration-password-error"
-        /><span id="registration-password-policy" class="mt-1 block text-sm text-stone-600">{{
-          copy.passwordPolicy
-        }}</span
-        ><span id="registration-password-error" class="error">{{
-          fieldError.password
-        }}</span></label
-      >
+      /></label>
+      <span id="registration-password-policy" class="mt-1 block text-sm text-stone-600">{{
+        copy.passwordPolicy
+      }}</span>
+      <span id="registration-password-error" class="error">{{ fieldError.password }}</span>
       <label class="block"
         >{{ copy.entryCode
         }}<input
@@ -574,11 +572,11 @@ async function focusFirstField(): Promise<void> {
           class="field"
           :aria-invalid="!!fieldError.password"
           aria-describedby="reset-password-policy reset-password-error"
-        /><span id="reset-password-policy" class="mt-1 block text-sm text-stone-600">{{
-          copy.passwordPolicy
-        }}</span
-        ><span id="reset-password-error" class="error">{{ fieldError.password }}</span></label
-      >
+      /></label>
+      <span id="reset-password-policy" class="mt-1 block text-sm text-stone-600">{{
+        copy.passwordPolicy
+      }}</span>
+      <span id="reset-password-error" class="error">{{ fieldError.password }}</span>
       <button class="primary" type="submit" :disabled="busy">{{ copy.resetPasswordAction }}</button>
     </form>
 

@@ -6,6 +6,20 @@ const membership = {
   household: { householdId: 'synthetic-house', name: 'River House', timezone: 'America/Chicago' },
 };
 
+interface ProfileFixture {
+  memberId: string;
+  displayName: string;
+  color: 'PINE' | 'LAKE';
+  version: number;
+}
+
+const existingProfile: ProfileFixture = {
+  memberId: 'synthetic-member',
+  displayName: 'River',
+  color: 'PINE',
+  version: 1,
+};
+
 function jwt(tokenUse: 'id' | 'access'): string {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
   return `${encode({ alg: 'none', kid: 'test' })}.${encode({
@@ -60,6 +74,51 @@ async function mockCognito(page: Page): Promise<void> {
   await page.route('http://localhost:9229/**', respond);
 }
 
+/** Keeps browser tests at the HTTP boundary while supplying §3 server state. */
+async function mockProfileAndDirectory(
+  page: Page,
+  initialProfile: ProfileFixture | null,
+): Promise<void> {
+  let profile = initialProfile;
+  await page.route('**/api/v1/profiles/me', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { profile } });
+      return;
+    }
+
+    const input = route.request().postDataJSON() as Pick<
+      ProfileFixture,
+      'displayName' | 'color' | 'version'
+    >;
+    profile = {
+      memberId: membership.memberId,
+      displayName: input.displayName,
+      color: input.color,
+      version: (profile?.version ?? 0) + 1,
+    };
+    await route.fulfill({ status: initialProfile ? 200 : 201, json: { profile } });
+  });
+  await page.route('**/api/v1/family-members', async (route) => {
+    await route.fulfill({
+      json: {
+        members: profile
+          ? [
+              {
+                memberId: profile.memberId,
+                username: 'parentone',
+                role: 'parent',
+                activationState: 'ACTIVE',
+                displayName: profile.displayName,
+                color: profile.color,
+                allowedActions: [],
+              },
+            ]
+          : [],
+      },
+    });
+  });
+}
+
 async function signIn(page: Page, attached: boolean): Promise<void> {
   await page.route('**/api/v1/memberships/current', (route) =>
     route.fulfill({
@@ -105,20 +164,28 @@ test('registers, verifies email, signs in, creates a household, and reaches onbo
       json: { membership },
     });
   });
+  await mockProfileAndDirectory(page, null);
   await signIn(page, false);
   await expect(page.getByRole('heading', { name: 'Create your household' })).toBeVisible();
   await page.getByLabel('Household name').fill('River House');
   await page.getByLabel('Household timezone').selectOption('America/Chicago');
   await page.getByRole('button', { name: 'Create household' }).click();
-  await expect(page.getByRole('heading', { name: 'River House' })).toBeVisible();
-  await expect(page.getByText('Next, add your family members')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Set up your profile' })).toBeVisible();
+  await page.getByLabel('Display name').fill('River');
+  await page.getByLabel('Lake').check();
+  await page.getByRole('button', { name: 'Continue to family management' }).click();
+  await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
+  await expect(page.getByText('River House')).toBeVisible();
+  await expect(page.getByText('@parentone')).toBeVisible();
 });
 
 test('restores only the current tab from sessionStorage and completely clears sign-out state', async ({
   page,
 }) => {
+  await mockProfileAndDirectory(page, existingProfile);
   await signIn(page, true);
-  await expect(page.getByRole('heading', { name: 'River House' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
+  await expect(page.getByText('River House')).toBeVisible();
   expect(
     await page.evaluate(() =>
       Object.keys(sessionStorage).some((key) => key === 'todone.auth.test-client.localSession'),
@@ -128,7 +195,7 @@ test('restores only the current tab from sessionStorage and completely clears si
   expect(page.url()).not.toContain(jwt('id'));
 
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'River House' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
   const indexedDatabases = await page.evaluate(async () =>
     (await indexedDB.databases()).map((db) => db.name),
   );

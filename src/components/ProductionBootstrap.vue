@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { loadAuthConfig } from '../config/authConfig';
 import { messages } from '../i18n/messages';
+import { applyMembershipContext } from '../presentation/appContext';
+import { applyProfileTone, clearProfileTone } from '../presentation/profileTone';
 import { meetsAccountPasswordPolicy } from '../services/accountPassword';
 import { AuthClient, type AuthActionResult } from '../services/authClient';
 import {
@@ -213,6 +215,7 @@ async function resolveMembership(idToken: string): Promise<void> {
     return;
   }
   membership.value = result.data.membership;
+  applyMembershipContext(membership.value);
   if (!membership.value) {
     await clearTransientScreenAndNavigate(AppRouteName.householdSetup);
     return;
@@ -238,6 +241,7 @@ async function resolveProfile(idToken: string): Promise<void> {
     await clearTransientScreenAndNavigate(AppRouteName.profileSetup);
     return;
   }
+  applyProfileTone(profile.value.color);
   if (membership.value?.role === 'child') {
     await clearTransientScreenAndNavigate(AppRouteName.todos);
     return;
@@ -299,6 +303,7 @@ async function submitHousehold(): Promise<void> {
       return;
     }
     membership.value = result.data.membership;
+    applyMembershipContext(membership.value);
     status.value = copy.created;
     statusIsError.value = false;
     await resolveProfile(token);
@@ -380,6 +385,7 @@ function signOut(message = copy.signedOut): void {
 
 function clearPrivateState(message: string): void {
   membership.value = null;
+  applyMembershipContext(null);
   password.value = '';
   gatePassword.value = '';
   code.value = '';
@@ -388,6 +394,7 @@ function clearPrivateState(message: string): void {
   displayName.value = '';
   profileColor.value = '';
   profile.value = null;
+  clearProfileTone();
   familyMembers.value = [];
   username.value = '';
   email.value = '';
@@ -483,11 +490,13 @@ async function focusRouteHeading(): Promise<void> {
 </script>
 
 <template>
-  <section
-    class="mx-auto max-w-xl rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8"
-  >
+  <section class="surface-card mx-auto max-w-xl p-5 sm:p-8">
     <div class="min-h-6" role="status" aria-live="polite">
-      <p v-if="status" class="text-sm" :class="statusIsError ? 'text-red-800' : 'text-leaf-900'">
+      <p
+        v-if="status"
+        class="status-region text-sm"
+        :class="{ 'status-region--error': statusIsError }"
+      >
         {{ status }}
       </p>
     </div>
@@ -498,12 +507,12 @@ async function focusRouteHeading(): Promise<void> {
       "
       aria-busy="true"
     >
-      <h2 class="text-xl font-semibold text-leaf-900">{{ copy.restoreHeading }}</h2>
-      <p class="mt-2 text-stone-600">{{ copy.restoring }}</p>
+      <h2 class="page-heading text-xl">{{ copy.restoreHeading }}</h2>
+      <p class="body-muted mt-2">{{ copy.restoring }}</p>
     </div>
 
     <form v-else-if="screen === 'signin'" class="space-y-4" @submit.prevent="signIn">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ copy.signIn }}</h2>
+      <h2 class="page-heading text-xl">{{ copy.signIn }}</h2>
       <label class="block"
         >{{ copy.username
         }}<input v-model="username" required autocomplete="username" class="field" :disabled="busy"
@@ -531,7 +540,7 @@ async function focusRouteHeading(): Promise<void> {
     </form>
 
     <form v-else-if="screen === 'register'" class="space-y-4" @submit.prevent="register">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ copy.createParent }}</h2>
+      <h2 class="page-heading text-xl">{{ copy.createParent }}</h2>
       <label class="block"
         >Username<input
           v-model="username"
@@ -557,7 +566,7 @@ async function focusRouteHeading(): Promise<void> {
           :aria-invalid="!!fieldError.password"
           aria-describedby="registration-password-policy registration-password-error"
       /></label>
-      <span id="registration-password-policy" class="mt-1 block text-sm text-stone-600">{{
+      <span id="registration-password-policy" class="body-muted mt-1 block text-sm">{{
         copy.passwordPolicy
       }}</span>
       <span id="registration-password-error" class="error">{{ fieldError.password }}</span>
@@ -571,7 +580,7 @@ async function focusRouteHeading(): Promise<void> {
           class="field"
           :aria-invalid="!!fieldError.registrationGatePassword"
           aria-describedby="entry-code-help entry-code-error"
-        /><span id="entry-code-help" class="mt-1 block text-sm text-stone-600">{{
+        /><span id="entry-code-help" class="body-muted mt-1 block text-sm">{{
           copy.entryCodeHelp
         }}</span
         ><span id="entry-code-error" class="error">{{
@@ -587,8 +596,8 @@ async function focusRouteHeading(): Promise<void> {
     </form>
 
     <form v-else-if="screen === 'confirm'" class="space-y-4" @submit.prevent="confirm">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ copy.verifyEmail }}</h2>
-      <p class="text-sm text-stone-600">{{ copy.verificationHelp }}</p>
+      <h2 class="page-heading text-xl">{{ copy.verifyEmail }}</h2>
+      <p class="body-muted text-sm">{{ copy.verificationHelp }}</p>
       <label class="block"
         >{{ copy.username
         }}<input v-model="username" required autocomplete="username" class="field"
@@ -610,7 +619,7 @@ async function focusRouteHeading(): Promise<void> {
     </form>
 
     <form v-else-if="screen === 'forgot'" class="space-y-4" @submit.prevent="startRecovery">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ copy.resetPassword }}</h2>
+      <h2 class="page-heading text-xl">{{ copy.resetPassword }}</h2>
       <label class="block"
         >Username<input v-model="username" required autocomplete="username" class="field"
       /></label>
@@ -621,7 +630,7 @@ async function focusRouteHeading(): Promise<void> {
     </form>
 
     <form v-else-if="screen === 'reset'" class="space-y-4" @submit.prevent="finishRecovery">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ copy.choosePassword }}</h2>
+      <h2 class="page-heading text-xl">{{ copy.choosePassword }}</h2>
       <label class="block"
         >{{ copy.username
         }}<input v-model="username" required autocomplete="username" class="field"
@@ -647,7 +656,7 @@ async function focusRouteHeading(): Promise<void> {
           :aria-invalid="!!fieldError.password"
           aria-describedby="reset-password-policy reset-password-error"
       /></label>
-      <span id="reset-password-policy" class="mt-1 block text-sm text-stone-600">{{
+      <span id="reset-password-policy" class="body-muted mt-1 block text-sm">{{
         copy.passwordPolicy
       }}</span>
       <span id="reset-password-error" class="error">{{ fieldError.password }}</span>
@@ -655,8 +664,8 @@ async function focusRouteHeading(): Promise<void> {
     </form>
 
     <form v-else-if="screen === 'household'" class="space-y-4" @submit.prevent="submitHousehold">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ copy.createHousehold }}</h2>
-      <p class="text-sm text-stone-600">{{ copy.householdHelp }}</p>
+      <h2 class="page-heading text-xl">{{ copy.createHousehold }}</h2>
+      <p class="body-muted text-sm">{{ copy.householdHelp }}</p>
       <label class="block"
         >Household name<input
           ref="firstField"
@@ -691,8 +700,8 @@ async function focusRouteHeading(): Promise<void> {
     </form>
 
     <div v-else-if="screen === 'profile-load-error'" class="space-y-4">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ profileCopy.heading }}</h2>
-      <p class="text-stone-700">{{ profileCopy.loadFailed }}</p>
+      <h2 class="page-heading text-xl">{{ profileCopy.heading }}</h2>
+      <p class="body-secondary">{{ profileCopy.loadFailed }}</p>
       <button type="button" class="primary" @click="retryProfile">{{ profileCopy.retry }}</button>
       <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>
     </div>
@@ -702,10 +711,10 @@ async function focusRouteHeading(): Promise<void> {
       class="space-y-5"
       @submit.prevent="submitProfile"
     >
-      <h2 class="text-xl font-semibold text-leaf-900">
+      <h2 class="page-heading text-xl">
         {{ screen === 'profile-edit' ? familyCopy.editProfile : profileCopy.heading }}
       </h2>
-      <p class="text-sm text-stone-600">{{ profileCopy.help }}</p>
+      <p class="body-muted text-sm">{{ profileCopy.help }}</p>
       <label class="block"
         >{{ profileCopy.displayName
         }}<input
@@ -723,7 +732,7 @@ async function focusRouteHeading(): Promise<void> {
         }}</span></label
       >
       <fieldset :aria-describedby="fieldError.color ? 'profile-color-error' : undefined">
-        <legend class="font-medium text-stone-950">{{ profileCopy.color }}</legend>
+        <legend class="body-strong font-medium">{{ profileCopy.color }}</legend>
         <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <label
             v-for="color in profileColors"
@@ -768,13 +777,13 @@ async function focusRouteHeading(): Promise<void> {
     </form>
 
     <div v-else-if="screen === 'family-loading'" aria-busy="true">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ familyCopy.heading }}</h2>
-      <p class="mt-2 text-stone-600">{{ familyCopy.loading }}</p>
+      <h2 class="page-heading text-xl">{{ familyCopy.heading }}</h2>
+      <p class="body-muted mt-2">{{ familyCopy.loading }}</p>
     </div>
 
     <div v-else-if="screen === 'family-load-error'" class="space-y-4">
-      <h2 class="text-xl font-semibold text-leaf-900">{{ familyCopy.heading }}</h2>
-      <p class="text-stone-700">{{ familyCopy.loadFailed }}</p>
+      <h2 class="page-heading text-xl">{{ familyCopy.heading }}</h2>
+      <p class="body-secondary">{{ familyCopy.loadFailed }}</p>
       <button type="button" class="primary" @click="retryFamilyManagement">
         {{ familyCopy.retry }}
       </button>
@@ -784,15 +793,15 @@ async function focusRouteHeading(): Promise<void> {
     <div v-else-if="screen === 'family-management' && membership" class="space-y-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-sm font-medium uppercase tracking-wide text-leaf-900">{{ copy.ready }}</p>
-          <h2 class="text-2xl font-semibold text-leaf-900">{{ familyCopy.heading }}</h2>
-          <p class="mt-1 text-sm text-stone-600">{{ membership.household.name }}</p>
+          <p class="meta-label text-sm">{{ copy.ready }}</p>
+          <h2 class="page-heading text-2xl">{{ familyCopy.heading }}</h2>
+          <p class="body-muted mt-1 text-sm">{{ membership.household.name }}</p>
         </div>
         <button type="button" class="secondary" @click="beginProfileEdit">
           {{ familyCopy.editProfile }}
         </button>
       </div>
-      <p v-if="familyMembers.length === 0" class="text-stone-700">{{ familyCopy.empty }}</p>
+      <p v-if="familyMembers.length === 0" class="body-secondary">{{ familyCopy.empty }}</p>
       <ul v-else class="grid gap-3 sm:grid-cols-2">
         <li v-for="member in familyMembers" :key="member.memberId" class="member-card">
           <span
@@ -801,8 +810,8 @@ async function focusRouteHeading(): Promise<void> {
             aria-hidden="true"
           />
           <div class="min-w-0 flex-1">
-            <p class="font-medium text-stone-950">{{ member.displayName }}</p>
-            <dl class="mt-2 grid gap-1 text-sm text-stone-700">
+            <p class="body-strong font-medium">{{ member.displayName }}</p>
+            <dl class="body-secondary mt-2 grid gap-1 text-sm">
               <div>
                 <dt class="sr-only">{{ familyCopy.username }}</dt>
                 <dd>@{{ member.username }}</dd>
@@ -820,7 +829,7 @@ async function focusRouteHeading(): Promise<void> {
                 </dd>
               </div>
             </dl>
-            <p v-if="member.allowedActions.length" class="mt-2 text-sm text-stone-600">
+            <p v-if="member.allowedActions.length" class="body-muted mt-2 text-sm">
               {{ familyCopy.pendingActions }}
             </p>
           </div>
@@ -830,39 +839,3 @@ async function focusRouteHeading(): Promise<void> {
     </div>
   </section>
 </template>
-
-<style scoped>
-.field {
-  @apply mt-1 block min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 py-2;
-  @apply text-stone-950 focus:border-leaf-600 focus:outline-none;
-  @apply focus:ring-2 focus:ring-leaf-600/30;
-}
-.primary {
-  @apply min-h-11 rounded-lg bg-leaf-900 px-5 py-2 font-medium text-white;
-  @apply disabled:cursor-not-allowed disabled:opacity-60;
-}
-.secondary {
-  @apply min-h-11 rounded-lg border border-leaf-900 px-4 py-2 font-medium text-leaf-900;
-  @apply focus:outline-none focus:ring-2 focus:ring-leaf-600/30;
-}
-.link {
-  @apply min-h-11 rounded px-1 text-leaf-900 underline underline-offset-4;
-  @apply disabled:opacity-60;
-}
-.error {
-  @apply mt-1 block min-h-5 text-sm text-red-800;
-}
-.profile-color-option {
-  @apply flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-stone-300 px-3 py-2;
-  @apply text-sm text-stone-950 focus-within:border-leaf-600 focus-within:ring-2 focus-within:ring-leaf-600/30;
-}
-.profile-color-option--selected {
-  @apply border-leaf-900 bg-leaf-50;
-}
-.profile-color-swatch {
-  @apply h-4 w-4 rounded-full ring-1 ring-black/20;
-}
-.member-card {
-  @apply flex min-w-0 gap-3 rounded-lg border border-stone-200 p-4;
-}
-</style>

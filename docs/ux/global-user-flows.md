@@ -100,3 +100,12 @@ sequenceDiagram
 - **Conflict occurs:** Show current authorized state, explain that another change won, and offer refresh or a new action based on that state.
 - **Access is removed:** Clear household state and route to a generic unavailable/signed-out surface without naming the removed household or resource.
 - **Deployment updates the PWA:** Do not interrupt an in-progress form. Offer a controlled refresh after the new shell is ready and ensure protected API data was not service-worker cached.
+
+## Visual-foundation UX journeys
+
+These journeys exercise the real local application after the visual-foundation implementation. They do not use the retained reference page.
+
+1. **Signed out:** Start at `/` with no session. Verify one visible Todone heading, the focused skip link reaches main content, the sign-in surface uses readable warm paper treatment, and Entry Code appears only after choosing account creation. Tab through the form: every control shows a visible focus indicator and remains at least an ordinary touch-target size.
+2. **Onboarding parent:** Use a first-parent account with no Membership, complete household setup, then profile setup. Verify validation/error copy remains associated with its fields; selecting a profile color shows the named swatch plus label; successful profile save reaches `/family` with the profile tone applied to the app shell and no changed security or onboarding behavior.
+3. **Active parent:** Sign in as an active parent with a Profile and go to `/family`. Verify the application navigation offers Family and My profile, does not offer unavailable Todo creation/history actions, retains logical reading order at compact and wide widths, and profile editing preserves focus/validation behavior.
+4. **Active child:** Sign in as an active child with a Profile and verify `/todos` is the landing route. Confirm application navigation offers My Todos and My profile, the work-in-progress surface is profile-toned but contains no fabricated Todo, no completion/create action, and no Todo API request. Toggle reduced motion in browser settings and verify the same route, text, focus, and reading order remain without non-essential movement.

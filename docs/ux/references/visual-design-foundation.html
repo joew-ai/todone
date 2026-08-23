@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Todone visual-design foundation reference</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bark: #2e2925;
+        --muted-bark: #6f675f;
+        --forest: #1f563f;
+        --forest-deep: #143d2e;
+        --forest-soft: #e5eee7;
+        --canvas: #f6f1e8;
+        --paper: #fffcf6;
+        --border: #d8cec0;
+        --warning: #a44232;
+        --success: #28624a;
+        --shadow: 0 12px 32px rgba(46, 41, 37, 0.1);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--bark);
+        font-family: Avenir Next, Avenir, Segoe UI, Inter, system-ui, sans-serif;
+        line-height: 1.45;
+      }
+      button { font: inherit; }
+      .reference-note {
+        margin: 0;
+        padding: 0.7rem 1rem;
+        background: #2e2925;
+        color: #fffcf6;
+        font-size: 0.9rem;
+        text-align: center;
+      }
+      .reference-note strong { color: #dcebdc; }
+      .demo { max-width: 1180px; margin: 1.5rem auto 3rem; padding: 0 1rem; }
+      .app {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 1.25rem;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        min-height: 4.5rem;
+        padding: 0.75rem 1rem;
+        background: linear-gradient(120deg, var(--forest-deep), var(--forest));
+        color: white;
+      }
+      .brand { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+      .identity { display: flex; align-items: center; gap: 0.6rem; font-size: 0.95rem; }
+      .avatar { width: 2rem; height: 2rem; border: 2px solid rgba(255,255,255,.75); border-radius: 999px; background: #7ca18a; }
+      .app-body { display: grid; min-height: 630px; }
+      .nav { display: none; background: #f0eee7; padding: 1.25rem; }
+      .nav p { margin: 0.35rem 0 0.8rem; color: var(--muted-bark); font-size: 0.85rem; }
+      .nav a { display: block; padding: 0.65rem 0.75rem; border-radius: 0.65rem; color: var(--bark); text-decoration: none; }
+      .nav a[aria-current="page"] { background: var(--forest-soft); color: var(--forest-deep); font-weight: 650; }
+      .content { min-width: 0; }
+      .personal-header { padding: 1.4rem 1.1rem 1.6rem; color: #183629; background: linear-gradient(125deg, #d9e9dd, #e9f0d9 58%, #f5e5ce); }
+      .personal-header--dusk { color: #30263b; background: linear-gradient(125deg, #e5dcef, #d8e8e5 60%, #f2e2cf); }
+      .eyebrow { margin: 0; font-size: 0.78rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+      h1, h2, p { margin-top: 0; }
+      h1 { margin-bottom: 0.35rem; font-size: clamp(1.8rem, 6vw, 2.7rem); letter-spacing: -0.045em; line-height: 1.05; }
+      h2 { margin-bottom: 0.3rem; font-size: 1.2rem; letter-spacing: -0.02em; }
+      .subtle { color: var(--muted-bark); }
+      .personal-header .subtle { color: inherit; opacity: .78; }
+      .task-list { background: #edf4e8; }
+      .task {
+        display: grid;
+        grid-template-columns: 2.7rem minmax(0,1fr) auto;
+        align-items: center;
+        gap: 0.65rem;
+        min-height: 5.4rem;
+        padding: 0.85rem 1.1rem;
+        border-bottom: 1px solid rgba(31, 86, 63, 0.15);
+        transition: opacity .25s ease, transform .25s ease, max-height .25s ease, padding .25s ease;
+      }
+      .task:nth-child(even) { background: rgba(255, 252, 246, 0.34); }
+      .task.completed { max-height: 0; min-height: 0; overflow: hidden; padding-top: 0; padding-bottom: 0; opacity: 0; transform: translateY(-5px); }
+      .complete {
+        display: grid;
+        width: 2.7rem;
+        height: 2.7rem;
+        place-items: center;
+        border: 2px solid #356d51;
+        border-radius: 999px;
+        background: rgba(255,255,255,.55);
+        color: #174b35;
+        cursor: pointer;
+      }
+      .complete:hover, .complete:focus-visible { background: white; outline: 3px solid rgba(31,86,63,.28); outline-offset: 2px; }
+      .complete.pop { animation: pop .38s ease both; }
+      .task-title { margin: 0; font-weight: 700; }
+      .task-meta { margin: 0.2rem 0 0; color: #56665a; font-size: 0.87rem; }
+      .due { color: #8a382d; font-size: 0.82rem; font-weight: 650; white-space: nowrap; }
+      .task-effect { position: relative; }
+      .task-effect::after {
+        position: absolute;
+        inset: -1.3rem;
+        pointer-events: none;
+        content: '';
+        opacity: 0;
+        background: radial-gradient(circle, rgba(245,220,130,.8) 0 2px, transparent 3px), radial-gradient(circle at 20% 75%, rgba(87,137,88,.7) 0 3px, transparent 4px), radial-gradient(circle at 72% 22%, rgba(131,171,114,.7) 0 2px, transparent 3px);
+      }
+      .task-effect.celebrate::after { animation: light 1.05s ease-out both; }
+      .status { min-height: 2rem; padding: 0.65rem 1.1rem; background: var(--paper); color: var(--success); font-size: 0.9rem; }
+      .status:empty { padding-top: 0; padding-bottom: 0; }
+      .parent-panel { padding: 1.4rem 1.1rem 2rem; }
+      .parent-title { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+      .button {
+        display: inline-flex;
+        min-height: 2.75rem;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        padding: 0.6rem 0.9rem;
+        border: 1px solid transparent;
+        border-radius: 0.7rem;
+        background: var(--forest);
+        color: white;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .button:focus-visible { outline: 3px solid rgba(31,86,63,.4); outline-offset: 3px; }
+      .member-context { display: flex; align-items: center; gap: .65rem; margin-top: 1rem; padding: .8rem; border: 1px solid var(--border); border-radius: .8rem; background: #fffdf8; }
+      .member-context .avatar { flex: 0 0 auto; background: #80638c; border-color: #80638c; }
+      .member-context p { margin: 0; }
+      .small { font-size: .85rem; }
+      .list-note { margin: 1.4rem 0 0; color: var(--muted-bark); font-size: .9rem; }
+      .review-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: 1rem 0 0; }
+      .review-controls button { min-height: 2.5rem; padding: .45rem .7rem; border: 1px solid var(--border); border-radius: .6rem; background: var(--paper); color: var(--bark); cursor: pointer; }
+      .review-controls button[aria-pressed="true"] { border-color: var(--forest); background: var(--forest-soft); color: var(--forest-deep); font-weight: 700; }
+      .comparison { display: grid; gap: 1rem; margin-top: 1rem; }
+      .comparison .app { min-height: 0; }
+      .comparison .app-header { min-height: 3.75rem; }
+      .comparison .personal-header { padding: 1rem; }
+      .comparison .task { min-height: 4.4rem; padding: .7rem 1rem; }
+      .comparison h1 { font-size: 1.55rem; }
+      @keyframes pop { 50% { transform: scale(1.15); background: #d8eedc; } }
+      @keyframes light { 20% { opacity: 1; transform: scale(.85); } 100% { opacity: 0; transform: scale(1.35); } }
+      @media (min-width: 760px) {
+        .app-body { grid-template-columns: 190px minmax(0, 1fr); }
+        .nav { display: block; }
+        .personal-header, .parent-panel { padding-left: 2rem; padding-right: 2rem; }
+        .task { padding-left: 2rem; padding-right: 2rem; }
+        .comparison { grid-template-columns: 1fr 1fr; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="reference-note"><strong>Reference only</strong> — reviewable visual direction; no production Todo behavior.</p>
+    <main class="demo">
+      <section class="app" aria-labelledby="child-title">
+        <header class="app-header"><span class="brand">Todone</span><span class="identity"><span class="avatar" aria-hidden="true"></span>Moss</span></header>
+        <div class="app-body">
+          <nav class="nav" aria-label="Child navigation"><p>River House</p><a href="#child-title" aria-current="page">My Todos</a><a href="#profile">My profile</a></nav>
+          <div class="content">
+            <header class="personal-header">
+              <p class="eyebrow">Saturday, August 23</p>
+              <h1 id="child-title">A clear little list</h1>
+              <p class="subtle">Three things to move through, one at a time.</p>
+            </header>
+            <div id="child-list" class="task-list" aria-live="polite">
+              <article class="task" data-task>
+                <button class="complete" type="button" aria-label="Complete Feed Juniper"><span aria-hidden="true">✓</span></button>
+                <div class="task-effect"><p class="task-title">Feed Juniper</p><p class="task-meta">Morning round · assigned by River</p></div>
+                <span class="due">Today</span>
+              </article>
+              <article class="task" data-task>
+                <button class="complete" type="button" aria-label="Complete Put the recycling out"><span aria-hidden="true">✓</span></button>
+                <div class="task-effect"><p class="task-title">Put the recycling out</p><p class="task-meta">Before dinner · household</p></div>
+                <span class="due">Due 6 PM</span>
+              </article>
+              <article class="task" data-task>
+                <button class="complete" type="button" aria-label="Complete Tidy the entryway"><span aria-hidden="true">✓</span></button>
+                <div class="task-effect"><p class="task-title">Tidy the entryway</p><p class="task-meta">Quick reset · household</p></div>
+                <span class="due">Tomorrow</span>
+              </article>
+            </div>
+            <p id="completion-status" class="status" role="status"></p>
+          </div>
+        </div>
+      </section>
+
+      <div class="review-controls" aria-label="Reference controls">
+        <button id="motion-toggle" type="button" aria-pressed="false">Preview reduced motion</button>
+        <button id="reset-demo" type="button">Reset completion preview</button>
+      </div>
+
+      <section class="comparison" aria-label="Parent and profile-color reference states">
+        <section class="app" aria-labelledby="parent-title">
+          <header class="app-header"><span class="brand">Todone</span><span class="identity"><span class="avatar" aria-hidden="true"></span>River</span></header>
+          <div class="parent-panel">
+            <div class="parent-title"><div><p class="eyebrow" style="color:#28624a">River House</p><h1 id="parent-title">Family work</h1><p class="subtle">See what needs attention without a dashboard.</p></div><a class="button" href="#create">+ Create Todo</a></div>
+            <div class="member-context"><span class="avatar" aria-hidden="true"></span><div><p><strong>Juniper</strong> <span class="small subtle">· Child</span></p><p class="small subtle">3 active Todos · one due today</p></div></div>
+            <p class="list-note">Family management and history remain ordinary secondary paths; Todo creation becomes prominent only when that capability exists.</p>
+          </div>
+        </section>
+        <section class="app" id="profile" aria-labelledby="dusk-title">
+          <header class="app-header"><span class="brand">Todone</span><span class="identity"><span class="avatar" aria-hidden="true" style="background:#80638c"></span>Juniper</span></header>
+          <header class="personal-header personal-header--dusk"><p class="eyebrow">Dusk profile tone</p><h1 id="dusk-title">A different identity, same meaning</h1><p class="subtle">Actions, warnings, and completion stay semantically consistent.</p></header>
+          <article class="task" style="background:#edf0e9"><span class="complete" aria-hidden="true">✓</span><div><p class="task-title">Read for 20 minutes</p><p class="task-meta">Light personal surface; profile color is not a state signal.</p></div><span class="due">Today</span></article>
+        </section>
+      </section>
+    </main>
+    <script>
+      const tasks = [...document.querySelectorAll('[data-task]')];
+      const status = document.querySelector('#completion-status');
+      const reducedMotionButton = document.querySelector('#motion-toggle');
+      let reducedMotion = false;
+      document.querySelectorAll('.complete').forEach((button) => {
+        button.addEventListener('click', () => {
+          const task = button.closest('[data-task]');
+          if (!task || task.classList.contains('completed')) return;
+          if (!reducedMotion) {
+            button.classList.add('pop');
+            task.querySelector('.task-effect').classList.add('celebrate');
+          }
+          status.textContent = `${button.getAttribute('aria-label').replace('Complete ', '')} completed.`;
+          window.setTimeout(() => task.classList.add('completed'), reducedMotion ? 60 : 900);
+        });
+      });
+      reducedMotionButton.addEventListener('click', () => {
+        reducedMotion = !reducedMotion;
+        reducedMotionButton.setAttribute('aria-pressed', String(reducedMotion));
+        reducedMotionButton.textContent = reducedMotion ? 'Reduced motion preview on' : 'Preview reduced motion';
+      });
+      document.querySelector('#reset-demo').addEventListener('click', () => {
+        tasks.forEach((task) => {
+          task.classList.remove('completed');
+          task.querySelector('.complete').classList.remove('pop');
+          task.querySelector('.task-effect').classList.remove('celebrate');
+        });
+        status.textContent = '';
+      });
+    </script>
+  </body>
+</html>

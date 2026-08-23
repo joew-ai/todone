@@ -28,5 +28,5 @@ Design should be resolved alongside each vertical slice. A small foundation now 
 - Depends on the deployable PWA foundation and the product brief's visual direction.
 - Becomes a design dependency for remaining family-account, Todo, lifecycle, label, and recurrence UI work.
 - Affects shared frontend tokens, primitives, application shell, authentication/bootstrap styling, retained HTML references, screenshot evidence, and visual/accessibility review.
-- Adds `lucide-vue-next` as the reviewed Vue 3 outline-icon dependency; icons are imported individually so unused icons do not enter the application bundle.
+- Adds `@lucide/vue`, the maintained successor to the initially selected `lucide-vue-next`, as the reviewed Vue 3 outline-icon dependency; icons are imported individually so unused icons do not enter the application bundle.
 - Adds no rewards, points, streaks, rare/jackpot outcomes, mascots, avatars, task illustrations, sound, vibration, dark mode, or product behavior beyond presentation and interaction feedback. Restrained static nature artwork remains optional when it meets the foundation's quality and accessibility bar.

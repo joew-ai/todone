@@ -195,6 +195,8 @@ test('registers, verifies email, signs in, creates a household, and reaches onbo
   await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
   await expect(page.getByText('River House')).toBeVisible();
   await expect(page.getByText('@parentone')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('Family');
+  await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('My profile');
 });
 
 test('restores only the current tab from sessionStorage and completely clears sign-out state', async ({
@@ -347,5 +349,8 @@ test('routes an active child to the Todo work-in-progress page without Todo traf
   await expect(page).toHaveTitle('Todos · Todone');
   await expect(page.getByText('Work in progress')).toBeVisible();
   await expect(page.getByRole('button', { name: /complete|create/i })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('My Todos');
+  await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('My profile');
+  await expect(page.locator('html')).toHaveAttribute('data-profile-color', 'PINE');
   expect(todoRequests).toBe(0);
 });

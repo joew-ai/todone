@@ -83,7 +83,11 @@ The application SHALL provide parents a responsive family-management view listin
 - **THEN** every active household member and pending parent appears with only the actions allowed for that role and activation state
 
 ### Requirement: Route-Backed Account Navigation
-Authentication, household/profile onboarding, self-profile, security, family-management, and member-creation page surfaces SHALL use canonical client-side routes whose URLs identify the current safe surface. Ordinary user navigation SHALL create browser history entries; automatic guard and normalization redirects SHALL replace the current entry. Browser Back, Forward, reload, and direct navigation SHALL restore the authorized surface without replaying writes or restoring secret input. Credentials, Entry Codes, verification/setup/recovery codes, tokens, email addresses, and usernames SHALL NOT appear in paths, query strings, fragments, or persisted history state.
+Authentication, household/profile onboarding, self-profile, security, family-management, member-creation, and authenticated Todo-landing page surfaces SHALL use canonical client-side routes whose URLs identify the current safe surface. The authenticated route map SHALL include `/todos`. Before the Todo capability ships, `/todos` SHALL be an explicit nonfunctional work-in-progress surface and SHALL NOT render fabricated Todo data or actions or call a Todo API. Ordinary user navigation SHALL create browser history entries; automatic guard and normalization redirects SHALL replace the current entry. Browser Back, Forward, reload, and direct navigation SHALL restore the authorized surface without replaying writes or restoring secret input. Credentials, Entry Codes, verification/setup/recovery codes, tokens, email addresses, and usernames SHALL NOT appear in paths, query strings, fragments, or persisted history state.
+
+#### Scenario: Active child enters before Todo delivery
+- **WHEN** an active child with a completed Profile signs in before the Todo capability is available
+- **THEN** the application replaces the entry route with `/todos` and renders only a clear work-in-progress surface with ordinary account navigation, no Todo records or controls, and no Todo API request
 
 #### Scenario: Member navigates between account surfaces
 - **WHEN** a member navigates from family management to self-profile editing and then uses browser Back

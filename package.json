@@ -75,6 +75,7 @@
     "aws-jwt-verify": "^5.2.1",
     "express": "^5.2.1",
     "vue": "^3.5.40",
+    "vue-router": "^5.2.0",
     "yaml": "^2.9.0"
   }
 }

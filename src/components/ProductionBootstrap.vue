@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { loadAuthConfig } from '../config/authConfig';
 import { messages } from '../i18n/messages';
 import { meetsAccountPasswordPolicy } from '../services/accountPassword';
@@ -18,23 +19,33 @@ import {
   type Profile,
   type ProfileColorId,
 } from '../services/profileClient';
+import {
+  AppRouteName,
+  bootstrapScreenForRoute,
+  isPublicRouteName,
+  type AppRouteName as AppRouteNameType,
+  type BootstrapPageScreen,
+} from '../router/routes';
 
-type Screen =
+type TransientScreen =
   | 'restoring'
-  | 'signin'
-  | 'register'
-  | 'confirm'
-  | 'forgot'
-  | 'reset'
   | 'membership-loading'
-  | 'household'
   | 'profile-loading'
   | 'profile-load-error'
-  | 'profile-setup'
   | 'family-loading'
-  | 'family-load-error'
-  | 'family-management'
-  | 'profile-edit';
+  | 'family-load-error';
+
+type Screen = BootstrapPageScreen | TransientScreen;
+
+const DEFAULT_TRANSIENT_SCREEN: TransientScreen = 'restoring';
+const routeByAuthScreen = {
+  signin: AppRouteName.signIn,
+  register: AppRouteName.register,
+  forgot: AppRouteName.forgotPassword,
+} as const;
+
+const route = useRoute();
+const router = useRouter();
 
 const supportedTimezones = [
   'America/Chicago',
@@ -55,7 +66,11 @@ const profileColors = Object.values(ProfileColor).map((color) => ({
   label: color.charAt(0) + color.slice(1).toLowerCase(),
 }));
 
-const screen = ref<Screen>('restoring');
+const transientScreen = ref<TransientScreen | null>(DEFAULT_TRANSIENT_SCREEN);
+const screen = computed<Screen>(() => {
+  const routeName = route.name as AppRouteNameType;
+  return transientScreen.value ?? bootstrapScreenForRoute(routeName) ?? DEFAULT_TRANSIENT_SCREEN;
+});
 const busy = ref(false);
 const status = ref('');
 const statusIsError = ref(false);
@@ -83,16 +98,30 @@ watch([householdName, timezone], () => {
   idempotencyKey = globalThis.crypto.randomUUID();
 });
 
+watch(screen, (currentScreen) => {
+  if (
+    ['restoring', 'membership-loading', 'profile-loading', 'family-loading'].includes(currentScreen)
+  ) {
+    return;
+  }
+  void focusRouteHeading();
+});
+
 onMounted(async () => {
   try {
     authClient = new AuthClient(loadAuthConfig());
     const session = await authClient.restoreSession();
     if (session) await resolveMembership(session.idToken);
-    else screen.value = 'signin';
+    else {
+      transientScreen.value = null;
+      if (!isPublicRouteName(route.name as AppRouteNameType)) {
+        await navigate(AppRouteName.signIn, true);
+      }
+    }
   } catch {
     status.value = messages.generic.unexpectedError;
     statusIsError.value = true;
-    screen.value = 'signin';
+    await clearTransientScreenAndNavigate(AppRouteName.signIn);
   }
 });
 
@@ -120,7 +149,7 @@ async function register(): Promise<void> {
     code.value = '';
     status.value = copy.checkEmail;
     statusIsError.value = false;
-    screen.value = 'confirm';
+    await navigate(AppRouteName.verifyEmail);
   });
 }
 
@@ -131,7 +160,7 @@ async function confirm(): Promise<void> {
     code.value = '';
     status.value = copy.emailVerified;
     statusIsError.value = false;
-    screen.value = 'signin';
+    await navigate(AppRouteName.signIn);
   });
 }
 
@@ -150,7 +179,7 @@ async function startRecovery(): Promise<void> {
     if (result.kind === 'error') return showError(result);
     status.value = copy.recoverySent;
     statusIsError.value = false;
-    screen.value = 'reset';
+    await navigate(AppRouteName.resetPassword);
   });
 }
 
@@ -167,32 +196,32 @@ async function finishRecovery(): Promise<void> {
     newPassword.value = '';
     status.value = copy.passwordReset;
     statusIsError.value = false;
-    screen.value = 'signin';
+    await navigate(AppRouteName.signIn);
   });
 }
 
 async function resolveMembership(idToken: string): Promise<void> {
-  screen.value = 'membership-loading';
+  transientScreen.value = 'membership-loading';
   const result = await fetchCurrentMembership(idToken);
   if (result.kind === 'error') {
     if (!result.recoverable) signOut(result.message);
     else {
       status.value = result.message;
       statusIsError.value = true;
-      screen.value = 'signin';
+      await clearTransientScreenAndNavigate(AppRouteName.signIn);
     }
     return;
   }
   membership.value = result.data.membership;
   if (!membership.value) {
-    screen.value = 'household';
+    await clearTransientScreenAndNavigate(AppRouteName.householdSetup);
     return;
   }
   await resolveProfile(idToken);
 }
 
 async function resolveProfile(idToken: string): Promise<void> {
-  screen.value = 'profile-loading';
+  transientScreen.value = 'profile-loading';
   const result = await fetchMyProfile(idToken);
   if (result.kind === 'error') {
     if (!result.recoverable) {
@@ -201,19 +230,29 @@ async function resolveProfile(idToken: string): Promise<void> {
     }
     status.value = profileCopy.loadFailed;
     statusIsError.value = true;
-    screen.value = 'profile-load-error';
+    transientScreen.value = 'profile-load-error';
     return;
   }
   profile.value = result.data.profile;
   if (!profile.value) {
-    screen.value = 'profile-setup';
+    await clearTransientScreenAndNavigate(AppRouteName.profileSetup);
+    return;
+  }
+  if (membership.value?.role === 'child') {
+    await clearTransientScreenAndNavigate(AppRouteName.todos);
+    return;
+  }
+  if (route.name === AppRouteName.profile) {
+    displayName.value = profile.value.displayName;
+    profileColor.value = profile.value.color;
+    transientScreen.value = null;
     return;
   }
   await loadFamilyManagement(idToken);
 }
 
 async function loadFamilyManagement(idToken: string): Promise<void> {
-  screen.value = 'family-loading';
+  transientScreen.value = 'family-loading';
   const result = await fetchFamilyMembers(idToken);
   if (result.kind === 'error') {
     if (!result.recoverable) {
@@ -222,11 +261,14 @@ async function loadFamilyManagement(idToken: string): Promise<void> {
     }
     status.value = familyCopy.loadFailed;
     statusIsError.value = true;
-    screen.value = 'family-load-error';
+    transientScreen.value = 'family-load-error';
     return;
   }
   familyMembers.value = result.data.members;
-  screen.value = 'family-management';
+  transientScreen.value = null;
+  if (route.name !== AppRouteName.family) {
+    await navigate(AppRouteName.family, true);
+  }
 }
 
 async function submitHousehold(): Promise<void> {
@@ -290,8 +332,13 @@ async function submitProfile(): Promise<void> {
       return;
     }
     profile.value = result.data.profile;
-    status.value = screen.value === 'profile-edit' ? familyCopy.profileSaved : profileCopy.saved;
+    status.value =
+      route.name === AppRouteName.profile ? familyCopy.profileSaved : profileCopy.saved;
     statusIsError.value = false;
+    if (membership.value?.role === 'child') {
+      await navigate(AppRouteName.todos, true);
+      return;
+    }
     await loadFamilyManagement(token);
   });
 }
@@ -307,7 +354,7 @@ function beginProfileEdit(): void {
   displayName.value = profile.value.displayName;
   profileColor.value = profile.value.color;
   fieldError.value = {};
-  screen.value = 'profile-edit';
+  void navigate(AppRouteName.profile);
 }
 
 async function retryFamilyManagement(): Promise<void> {
@@ -318,7 +365,7 @@ async function retryFamilyManagement(): Promise<void> {
 
 function cancelProfileEdit(): void {
   fieldError.value = {};
-  screen.value = 'family-management';
+  void navigate(AppRouteName.family);
 }
 
 function signOut(message = copy.signedOut): void {
@@ -347,10 +394,10 @@ function clearPrivateState(message: string): void {
   fieldError.value = {};
   status.value = message;
   statusIsError.value = false;
-  screen.value = 'signin';
+  void clearTransientScreenAndNavigate(AppRouteName.signIn);
 }
 
-function chooseScreen(next: Screen): void {
+function chooseScreen(next: Extract<BootstrapPageScreen, 'signin' | 'register' | 'forgot'>): void {
   fieldError.value = {};
   status.value = '';
   statusIsError.value = false;
@@ -358,7 +405,18 @@ function chooseScreen(next: Screen): void {
   gatePassword.value = '';
   code.value = '';
   newPassword.value = '';
-  screen.value = next;
+  void navigate(routeByAuthScreen[next]);
+}
+
+async function navigate(routeName: AppRouteNameType, replace = false): Promise<void> {
+  if (route.name === routeName) return;
+  if (replace) await router.replace({ name: routeName });
+  else await router.push({ name: routeName });
+}
+
+async function clearTransientScreenAndNavigate(routeName: AppRouteNameType): Promise<void> {
+  transientScreen.value = null;
+  await navigate(routeName, true);
 }
 
 async function run(action: () => Promise<void>): Promise<void> {
@@ -413,6 +471,14 @@ function browserTimezone(): string {
 async function focusFirstField(): Promise<void> {
   await nextTick();
   firstField.value?.focus();
+}
+
+async function focusRouteHeading(): Promise<void> {
+  await nextTick();
+  const heading = globalThis.document.querySelector('#main-content h2');
+  if (!heading || !(heading instanceof globalThis.HTMLElement)) return;
+  heading.tabIndex = -1;
+  heading.focus();
 }
 </script>
 
@@ -524,6 +590,10 @@ async function focusFirstField(): Promise<void> {
       <h2 class="text-xl font-semibold text-leaf-900">{{ copy.verifyEmail }}</h2>
       <p class="text-sm text-stone-600">{{ copy.verificationHelp }}</p>
       <label class="block"
+        >{{ copy.username
+        }}<input v-model="username" required autocomplete="username" class="field"
+      /></label>
+      <label class="block"
         >Verification code<input
           v-model="code"
           required
@@ -552,6 +622,10 @@ async function focusFirstField(): Promise<void> {
 
     <form v-else-if="screen === 'reset'" class="space-y-4" @submit.prevent="finishRecovery">
       <h2 class="text-xl font-semibold text-leaf-900">{{ copy.choosePassword }}</h2>
+      <label class="block"
+        >{{ copy.username
+        }}<input v-model="username" required autocomplete="username" class="field"
+      /></label>
       <label class="block"
         >{{ copy.recoveryCode
         }}<input

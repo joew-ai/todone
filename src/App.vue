@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProductionBootstrap from './components/ProductionBootstrap.vue';
+import { RouterView } from 'vue-router';
 </script>
 
 <template>
@@ -11,6 +11,6 @@ import ProductionBootstrap from './components/ProductionBootstrap.vue';
   </header>
 
   <main id="main-content" class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-    <ProductionBootstrap />
+    <RouterView />
   </main>
 </template>

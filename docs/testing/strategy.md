@@ -105,6 +105,7 @@ Critical flows run through the browser against a local application and local API
 
 - Production registration gate including closed registration, Cognito email confirmation/resend, sign-in, current-tab restoration from `sessionStorage`, Forgot Password, sign-out, household creation, and onboarding. Browser tests assert that tokens never enter `localStorage`, IndexedDB, URLs, or service-worker caches.
 - Parent member creation/reset/removal and self-profile editing.
+- Canonical route guards, Back/Forward, reload/deep links, secret-free history, and the pre-Todo child `/todos` landing. The placeholder test proves that it makes no Todo API request and exposes no Todo action.
 - Parent Todo assignment, child completion, parent history, undo/reopen, archive/restore, and delete confirmation/cancellation.
 - Label selection/creation/filtering and recurrence current/history behavior as those capabilities ship.
 - Session expiry, access removal, network failure, stale conflict, and safe retry.
@@ -116,6 +117,8 @@ At minimum, critical specs run at 390 x 844, 820 x 1180, and 1440 x 900 CSS pixe
 Automated checks scan each changed route and interaction state with no confirmed violations accepted. Tool false positives require a recorded manual review and rationale. Manual review covers keyboard-only operation, logical/visible focus, screen-reader labels and announcements, zoom/reflow, contrast, touch targets, reduced motion, destructive dialogs, and focus after dynamic list changes.
 
 The reviewer records browser, viewport, screen reader where used, flow, and result. Automated snapshots and accessibility trees are reviewed for meaningful changes, never bulk-accepted.
+
+Before product-owner review of a changed UI slice, the implementing engineer supplies concise UX journeys naming the starting role/state, canonical route, actions, and expected visible, focus, and navigation results. These journeys exercise the real local application after automated browser smoke; a second post-implementation mockup is not required.
 
 ### Security-negative testing
 

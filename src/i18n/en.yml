@@ -4,6 +4,25 @@
       'unexpectedError': 'Something went wrong. Please try again.',
       'networkError': 'Could not reach the server. Check your connection and try again.',
     },
+  'navigation':
+    {
+      'appName': 'Todone',
+      'homeTitle': 'Home',
+      'signInTitle': 'Sign in',
+      'registerTitle': 'Create account',
+      'verifyEmailTitle': 'Verify email',
+      'forgotPasswordTitle': 'Reset password',
+      'resetPasswordTitle': 'Choose a new password',
+      'activateParentTitle': 'Activate parent account',
+      'todosTitle': 'Todos',
+      'householdSetupTitle': 'Create your household',
+      'profileSetupTitle': 'Set up your profile',
+      'familyTitle': 'Family management',
+      'profileTitle': 'Edit my profile',
+      'securityTitle': 'Security settings',
+      'newChildTitle': 'Create child account',
+      'newParentTitle': 'Create parent account',
+    },
   'bootstrap':
     {
       'checkEmail': 'Check your email for a verification code.',

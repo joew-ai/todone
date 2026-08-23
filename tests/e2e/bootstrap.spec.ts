@@ -6,6 +6,12 @@ const membership = {
   household: { householdId: 'synthetic-house', name: 'River House', timezone: 'America/Chicago' },
 };
 
+const childMembership = {
+  memberId: 'synthetic-child',
+  role: 'child',
+  household: { householdId: 'synthetic-house', name: 'River House', timezone: 'America/Chicago' },
+};
+
 interface ProfileFixture {
   memberId: string;
   displayName: string;
@@ -119,12 +125,15 @@ async function mockProfileAndDirectory(
   });
 }
 
-async function signIn(page: Page, attached: boolean): Promise<void> {
+async function signIn(
+  page: Page,
+  currentMembership: () => typeof membership | typeof childMembership | null,
+): Promise<void> {
   await page.route('**/api/v1/memberships/current', (route) =>
     route.fulfill({
       status: 200,
       headers: { 'cache-control': 'no-store' },
-      json: { membership: attached ? membership : null },
+      json: { membership: currentMembership() },
     }),
   );
   await page.getByLabel('Username').fill('ParentOne');
@@ -140,12 +149,20 @@ test.beforeEach(async ({ page }) => {
 test('registers, verifies email, signs in, creates a household, and reaches onboarding', async ({
   page,
 }) => {
+  let currentMembership: typeof membership | null = null;
   await page.getByRole('button', { name: 'Create first-parent account' }).click();
   await page.getByLabel('Username').fill('ParentOne');
   await page.getByLabel('Recovery email').fill('parent@example.invalid');
   await page.getByLabel('Password', { exact: true }).fill('StrongPassword123!');
   await page.getByLabel('Entry Code').fill('synthetic-gate');
   await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Verify your recovery email' })).toBeVisible();
+  await expect(page).toHaveURL(/\/verify-email$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/register$/);
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Entry Code')).toHaveValue('');
+  await page.goForward();
   await expect(page.getByRole('heading', { name: 'Verify your recovery email' })).toBeVisible();
   await page.getByLabel('Verification code').fill('123456');
   await page.getByRole('button', { name: 'Verify email' }).click();
@@ -163,9 +180,10 @@ test('registers, verifies email, signs in, creates a household, and reaches onbo
       headers: { 'cache-control': 'no-store' },
       json: { membership },
     });
+    currentMembership = membership;
   });
   await mockProfileAndDirectory(page, null);
-  await signIn(page, false);
+  await signIn(page, () => currentMembership);
   await expect(page.getByRole('heading', { name: 'Create your household' })).toBeVisible();
   await page.getByLabel('Household name').fill('River House');
   await page.getByLabel('Household timezone').selectOption('America/Chicago');
@@ -183,9 +201,15 @@ test('restores only the current tab from sessionStorage and completely clears si
   page,
 }) => {
   await mockProfileAndDirectory(page, existingProfile);
-  await signIn(page, true);
+  await signIn(page, () => membership);
   await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
   await expect(page.getByText('River House')).toBeVisible();
+  await page.getByRole('button', { name: 'Edit my profile' }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByRole('heading', { name: 'Edit my profile' })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/family$/);
+  await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
   expect(
     await page.evaluate(() =>
       Object.keys(sessionStorage).some((key) => key === 'todone.auth.test-client.localSession'),
@@ -269,7 +293,59 @@ test('requires a selectable timezone when browser detection is unavailable', asy
     };
   });
   await page.reload();
-  await signIn(page, false);
+  await signIn(page, () => null);
   await expect(page.getByLabel('Household timezone')).toHaveValue('');
   await expect(page.getByLabel('Household timezone')).toHaveAttribute('required', '');
+});
+
+test('keeps verification identity out of the URL while allowing direct route entry', async ({
+  page,
+}) => {
+  await page.goto('/verify-email');
+
+  await expect(page).toHaveURL(/\/verify-email$/);
+  const heading = page.getByRole('heading', { name: 'Verify your recovery email' });
+  await expect(heading).toBeVisible();
+  await expect(heading).toBeFocused();
+  await expect(page).toHaveTitle('Verify email · Todone');
+  await expect(page.getByLabel('Username')).toBeVisible();
+  await expect(page.getByLabel('Verification code')).toBeVisible();
+  expect(page.url()).not.toContain('?');
+  expect(page.url()).not.toContain('#');
+});
+
+test('routes an active child to the Todo work-in-progress page without Todo traffic', async ({
+  page,
+}) => {
+  let todoRequests = 0;
+  await page.route('**/api/v1/todos**', async (route) => {
+    todoRequests += 1;
+    await route.abort();
+  });
+  await page.route('**/api/v1/memberships/current', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'cache-control': 'no-store' },
+      json: { membership: childMembership },
+    }),
+  );
+  await mockProfileAndDirectory(page, {
+    memberId: childMembership.memberId,
+    displayName: 'Moss',
+    color: 'PINE',
+    version: 1,
+  });
+
+  await page.getByLabel('Username').fill('ChildOne');
+  await page.getByLabel('Password').fill('StrongPassword123!');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+
+  await expect(page).toHaveURL(/\/todos$/);
+  const heading = page.getByRole('heading', { name: 'Todos' });
+  await expect(heading).toBeVisible();
+  await expect(heading).toBeFocused();
+  await expect(page).toHaveTitle('Todos · Todone');
+  await expect(page.getByText('Work in progress')).toBeVisible();
+  await expect(page.getByRole('button', { name: /complete|create/i })).toHaveCount(0);
+  expect(todoRequests).toBe(0);
 });

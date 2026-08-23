@@ -7,10 +7,10 @@ Design should be resolved alongside each vertical slice. A small foundation now 
 ## What Changes
 
 - Establish a light-only "forest at dusk" visual language with deep forest anchors, profile-derived tonal surfaces, mature nature-derived accents, and accessible semantic state colors.
-- Define system-first typography, spacing, shape, elevation, icon, focus, motion, and responsive app-shell rules as reusable design tokens and component contracts.
-- Define role-appropriate navigation priorities: children land directly on their assigned Todos and parents retain a prominent path to create and assign one-off Todos.
+- Define system-first typography, spacing, shape, elevation, Lucide outline-icon, focus, motion, and responsive app-shell rules as reusable design tokens and component contracts.
+- Define role-appropriate navigation priorities: children land on canonical `/todos`, which remains an explicit nonfunctional work-in-progress surface until assigned Todos ship, and parents retain a prominent path to create and assign one-off Todos once that capability is available.
 - Define a server-confirmed Todo completion interaction that rotates among equally special nature-inspired treatments before removing the completed row, without sound, vibration, rarity mechanics, rewards, or delayed access to the next task.
-- Require lightweight mockups and state review before implementing each substantial new UI surface, followed by responsive, visual, motion, and accessibility review within that feature change.
+- Require a quick, self-contained HTML reference page for human review before implementing each substantial new UI surface, retain the accepted page as a decision reference, and follow implementation with concise UX journeys that the reviewer exercises in the real app.
 - Bring the already-delivered authentication and household-bootstrap surfaces under the shared visual foundation without changing their behavior or security contracts.
 
 ## Capabilities
@@ -27,5 +27,6 @@ Design should be resolved alongside each vertical slice. A small foundation now 
 
 - Depends on the deployable PWA foundation and the product brief's visual direction.
 - Becomes a design dependency for remaining family-account, Todo, lifecycle, label, and recurrence UI work.
-- Affects shared frontend tokens, primitives, application shell, authentication/bootstrap styling, screenshot references, and visual/accessibility review.
+- Affects shared frontend tokens, primitives, application shell, authentication/bootstrap styling, retained HTML references, screenshot evidence, and visual/accessibility review.
+- Adds `lucide-vue-next` as the reviewed Vue 3 outline-icon dependency; icons are imported individually so unused icons do not enter the application bundle.
 - Adds no rewards, points, streaks, rare/jackpot outcomes, mascots, avatars, task illustrations, sound, vibration, dark mode, or product behavior beyond presentation and interaction feedback. Restrained static nature artwork remains optional when it meets the foundation's quality and accessibility bar.

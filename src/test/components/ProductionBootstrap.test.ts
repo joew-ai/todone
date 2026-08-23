@@ -42,6 +42,12 @@ vi.mock('../../services/profileClient', () => ({
 vi.mock('../../services/familyClient', () => ({ fetchFamilyMembers }));
 
 const { default: ProductionBootstrap } = await import('../../components/ProductionBootstrap.vue');
+const { router } = await import('../../router');
+const { AppRouteName } = await import('../../router/routes');
+
+function mountBootstrap(options: Record<string, unknown> = {}) {
+  return mount(ProductionBootstrap, { global: { plugins: [router] }, ...options });
+}
 
 const membership = {
   memberId: 'member-one',
@@ -54,19 +60,20 @@ const membership = {
 };
 
 describe('ProductionBootstrap', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     restoreSession.mockResolvedValue(null);
     fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership: null } });
     fetchMyProfile.mockResolvedValue({ kind: 'success', data: { profile: null } });
     fetchFamilyMembers.mockResolvedValue({ kind: 'success', data: { members: [] } });
     getIdToken.mockReturnValue('id-token');
+    await router.push({ name: AppRouteName.signIn });
   });
 
   it('shows restoration without flashing signed-out content, then renders sign in', async () => {
     let finish: (value: null) => void = () => undefined;
     restoreSession.mockReturnValue(new Promise((resolve) => (finish = resolve)));
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     expect(wrapper.text()).toContain('Restoring your private session');
     expect(wrapper.text()).not.toContain('Create first-parent account');
     finish(null);
@@ -76,7 +83,7 @@ describe('ProductionBootstrap', () => {
 
   it('restores the same-tab session and gates an unattached account at household creation', async () => {
     restoreSession.mockResolvedValue({ idToken: 'restored-token' });
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     await flushPromises();
     expect(fetchCurrentMembership).toHaveBeenCalledWith('restored-token');
     expect(wrapper.get('h2').text()).toBe('Create your household');
@@ -86,12 +93,13 @@ describe('ProductionBootstrap', () => {
     registerFirstParent.mockResolvedValue({ kind: 'success' });
     confirmRegistration.mockResolvedValue({ kind: 'success' });
     resendConfirmationCode.mockResolvedValue({ kind: 'success' });
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     await flushPromises();
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Create first-parent'))!
       .trigger('click');
+    await flushPromises();
     await wrapper.get('input[autocomplete="username"]').setValue('ParentOne');
     await wrapper.get('input[autocomplete="email"]').setValue('parent@example.invalid');
     await wrapper.get('input[autocomplete="new-password"]').setValue('StrongPassword123!');
@@ -123,12 +131,13 @@ describe('ProductionBootstrap', () => {
       message: 'That username is already in use.',
       recoverable: true,
     });
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     await flushPromises();
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Create first-parent'))!
       .trigger('click');
+    await flushPromises();
     for (const [selector, value] of [
       ['input[autocomplete="username"]', 'ParentOne'],
       ['input[autocomplete="email"]', 'parent@example.invalid'],
@@ -143,12 +152,13 @@ describe('ProductionBootstrap', () => {
   });
 
   it('labels the registration gate as Entry Code and blocks weak account passwords', async () => {
-    const wrapper = mount(ProductionBootstrap, { attachTo: document.body });
+    const wrapper = mountBootstrap({ attachTo: document.body });
     await flushPromises();
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Create first-parent'))!
       .trigger('click');
+    await flushPromises();
     await wrapper.get('input[autocomplete="username"]').setValue('ParentOne');
     await wrapper.get('input[autocomplete="email"]').setValue('parent@example.invalid');
     await wrapper.get('input[autocomplete="off"]').setValue('gate-private');
@@ -171,12 +181,13 @@ describe('ProductionBootstrap', () => {
   it('offers generic Forgot Password initiation and completes recovery', async () => {
     forgotPassword.mockResolvedValue({ kind: 'success' });
     confirmForgotPassword.mockResolvedValue({ kind: 'success' });
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     await flushPromises();
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Forgot'))!
       .trigger('click');
+    await flushPromises();
     await wrapper.get('input[autocomplete="username"]').setValue('ParentOne');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
@@ -195,12 +206,13 @@ describe('ProductionBootstrap', () => {
 
   it('shows the same password policy and focuses the recovery password after weak input', async () => {
     forgotPassword.mockResolvedValue({ kind: 'success' });
-    const wrapper = mount(ProductionBootstrap, { attachTo: document.body });
+    const wrapper = mountBootstrap({ attachTo: document.body });
     await flushPromises();
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Forgot'))!
       .trigger('click');
+    await flushPromises();
     await wrapper.get('input[autocomplete="username"]').setValue('ParentOne');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
@@ -222,7 +234,7 @@ describe('ProductionBootstrap', () => {
   it('validates household name with focus, then requires profile setup after creation', async () => {
     restoreSession.mockResolvedValue({ idToken: 'token' });
     createHousehold.mockResolvedValue({ kind: 'success', data: { membership } });
-    const wrapper = mount(ProductionBootstrap, { attachTo: document.body });
+    const wrapper = mountBootstrap({ attachTo: document.body });
     await flushPromises();
     await wrapper.get('form').trigger('submit');
     await flushPromises();
@@ -231,6 +243,7 @@ describe('ProductionBootstrap', () => {
     expect(document.activeElement).toBe(name.element);
     await name.setValue('River House');
     await wrapper.get('select').setValue('America/Chicago');
+    fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership } });
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(createHousehold).toHaveBeenCalledWith(
@@ -251,7 +264,7 @@ describe('ProductionBootstrap', () => {
         profile: { memberId: 'member-one', displayName: 'River', color: 'LAKE', version: 1 },
       },
     });
-    const wrapper = mount(ProductionBootstrap, { attachTo: document.body });
+    const wrapper = mountBootstrap({ attachTo: document.body });
     await flushPromises();
     expect(wrapper.get('h2').text()).toBe('Set up your profile');
     await wrapper.get('form').trigger('submit');
@@ -261,6 +274,12 @@ describe('ProductionBootstrap', () => {
     expect(document.activeElement).toBe(name.element);
     await name.setValue('River');
     await wrapper.get('input[value="LAKE"]').setValue();
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'member-one', displayName: 'River', color: 'LAKE', version: 1 },
+      },
+    });
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(saveMyProfile).toHaveBeenCalledWith('id-token', {
@@ -278,12 +297,13 @@ describe('ProductionBootstrap', () => {
     fetchMyProfile
       .mockResolvedValueOnce({ kind: 'error', message: 'Offline', recoverable: true })
       .mockResolvedValueOnce({ kind: 'success', data: { profile: null } });
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     await flushPromises();
     expect(wrapper.text()).toContain('We could not load your profile');
+    const initialProfileReads = fetchMyProfile.mock.calls.length;
     await wrapper.get('button.primary').trigger('click');
     await flushPromises();
-    expect(fetchMyProfile).toHaveBeenCalledTimes(2);
+    expect(fetchMyProfile.mock.calls.length).toBeGreaterThan(initialProfileReads);
     expect(wrapper.get('h2').text()).toBe('Set up your profile');
   });
 
@@ -318,10 +338,11 @@ describe('ProductionBootstrap', () => {
         profile: { memberId: 'member-one', displayName: 'River Two', color: 'LAKE', version: 2 },
       },
     });
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     await flushPromises();
     expect(wrapper.text()).toContain('@parent-one');
     await wrapper.get('button.secondary').trigger('click');
+    await flushPromises();
     await wrapper.get('input[autocomplete="nickname"]').setValue('River Two');
     await wrapper.get('input[value="LAKE"]').setValue();
     await wrapper.get('form').trigger('submit');
@@ -344,13 +365,15 @@ describe('ProductionBootstrap', () => {
       },
     });
     fetchFamilyMembers.mockResolvedValue({ kind: 'success', data: { members: [] } });
-    const wrapper = mount(ProductionBootstrap);
+    const wrapper = mountBootstrap();
     await flushPromises();
     expect(wrapper.text()).toContain('River House');
+    restoreSession.mockResolvedValue(null);
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Sign out')!
       .trigger('click');
+    await flushPromises();
     expect(signOut).toHaveBeenCalledOnce();
     expect(wrapper.text()).not.toContain('River House');
     expect(wrapper.get('h2').text()).toBe('Sign in');

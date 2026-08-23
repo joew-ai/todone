@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Mature Nature-Inspired Visual Language
-Todone SHALL use one light-only, nature-inspired visual language built from deep forest anchors, profile-derived tonal personal surfaces, warm readable form/settings surfaces, and stable semantic state colors. The visual language SHALL define centralized tokens for color, typography, spacing, shape, elevation, iconography, focus, disabled, status, and motion states plus accessible tonal families for every canonical profile color. It SHALL feel appropriate to adolescents and adults and SHALL NOT introduce mascots, animals, illustrated task objects, emoji decoration, points, streaks, rewards, rare/jackpot outcomes, sound, or vibration.
+Todone SHALL use one light-only, nature-inspired visual language built from deep forest anchors, profile-derived tonal personal surfaces, warm readable form/settings surfaces, and stable semantic state colors. The visual language SHALL define centralized authored tokens for color, typography, spacing, shape, elevation, iconography, focus, disabled, status, and motion states plus accessible tonal families for every canonical profile color. Framework utilities SHALL resolve through those authored tokens rather than making a stock framework palette the product language. It SHALL feel appropriate to adolescents and adults and SHALL NOT introduce mascots, animals, illustrated task objects, emoji decoration, points, streaks, rewards, rare/jackpot outcomes, sound, or vibration.
 
 #### Scenario: Dense family surface uses the shared language
 - **WHEN** a family-management or Todo surface presents primary actions with supporting metadata
@@ -27,11 +27,11 @@ Todone SHALL use a system-first sans-serif font stack that remains legible and s
 - **THEN** headings, labels, controls, metadata, and Todo rows retain their intended hierarchy without overlap or truncation of essential content
 
 ### Requirement: Role-Prioritized Application Shell
-The signed-in application shell SHALL prioritize assigned active Todos and completion for children. It SHALL provide parents a prominent keyboard-accessible path to create and assign a one-off Todo whenever that capability is available, while preserving clear household/member context and access to family management and history. Responsive composition SHALL NOT change authorization or hide the only path to an available primary action.
+The signed-in application shell SHALL use canonical `/todos` as the child landing destination. Until the Todo capability is delivered, `/todos` SHALL identify itself as work in progress and SHALL NOT fabricate data, controls, loading states, or availability. Once delivered, the shell SHALL prioritize assigned active Todos and completion for children. It SHALL provide parents a prominent keyboard-accessible path to create and assign a one-off Todo whenever that capability is available, while preserving clear household/member context and access to available family management and history. Responsive composition SHALL NOT change authorization or hide the only path to an available primary action.
 
 #### Scenario: Child enters the application
 - **WHEN** an active child session resolves successfully
-- **THEN** the primary destination is that child's assigned active Todos and completion actions are visually and semantically prominent
+- **THEN** the application routes to `/todos`; before Todo delivery it shows only a work-in-progress page, and after Todo delivery it shows that child's assigned active Todos with visually and semantically prominent completion actions
 
 #### Scenario: Parent needs to assign work
 - **WHEN** an active parent uses any supported viewport after Todo creation is available
@@ -57,8 +57,8 @@ Todo completion feedback SHALL begin its celebratory phase only after the server
 - **THEN** it does not delay input, focus, scrolling, confirmed-state presentation, or row removal and its complexity is adjusted when measured browser behavior shows visible jank or long main-thread work
 
 ### Requirement: Incremental Design Review
-Every change that introduces or materially alters a user-facing surface SHALL include design exploration before final styling and visual review before the change is complete. Exploration SHALL cover the primary compact state, materially different responsive compositions, realistic metadata, and applicable loading, empty, error, success, disabled, conflict, and destructive states. Review SHALL include real implementation screenshots, keyboard/focus behavior, contrast, reduced motion, 320-pixel reflow, and 200-percent zoom.
+Every change that introduces or materially alters a user-facing surface SHALL include a quick standalone HTML reference presented for human review before final implementation and retained as a decision reference. Exploration SHALL cover the primary compact state, materially different responsive compositions, realistic metadata, and applicable loading, empty, error, success, disabled, conflict, and destructive states. After implementation, review SHALL use the real application with documented UX journeys and SHALL include real implementation screenshots, keyboard/focus behavior, contrast, reduced motion, 320-pixel reflow, and 200-percent zoom. A second post-implementation mockup SHALL NOT be required.
 
 #### Scenario: Feature introduces a new screen
 - **WHEN** a change adds a family, Todo, history, label, or recurrence screen
-- **THEN** its design record identifies accepted hierarchy and component behavior before implementation and its verification records responsive visual and accessibility review before completion
+- **THEN** its retained HTML reference and design record identify accepted hierarchy and component behavior before implementation, and its verification supplies direct-app UX journeys plus responsive visual and accessibility evidence before completion

@@ -30,6 +30,7 @@ flowchart TD
 - An authenticated account without Membership can create exactly one new household. Creation is atomic from the user's perspective and safe to retry.
 - Browser timezone is a prefill only. The parent confirms a valid IANA timezone or selects one when detection is unavailable.
 - Existing members bypass bootstrap. Removed or inactive members are denied even with an otherwise valid session.
+- After Membership and Profile resolution, an active child lands on canonical `/todos`. Until the first Todo capability ships, that route clearly says the surface is work in progress and contains no Todo data, Todo controls, or Todo API activity. Parents retain the nearest currently useful authorized landing surface until a real parent Todo home exists.
 - Forgot Password is available to parent accounts with verified email. Children use parent-managed reset, not email recovery.
 - Sign-out clears session and private UI state, then returns focus to the signed-out heading.
 

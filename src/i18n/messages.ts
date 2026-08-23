@@ -55,6 +55,24 @@ export interface BootstrapMessages {
 
 interface EnglishMessages {
   generic: { unexpectedError: string; networkError: string };
+  navigation: {
+    appName: string;
+    homeTitle: string;
+    signInTitle: string;
+    registerTitle: string;
+    verifyEmailTitle: string;
+    forgotPasswordTitle: string;
+    resetPasswordTitle: string;
+    activateParentTitle: string;
+    todosTitle: string;
+    householdSetupTitle: string;
+    profileSetupTitle: string;
+    familyTitle: string;
+    profileTitle: string;
+    securityTitle: string;
+    newChildTitle: string;
+    newParentTitle: string;
+  };
   bootstrap: BootstrapMessages;
   householdClient: { sessionEnded: string; requestFailed: string };
   profileApi: {

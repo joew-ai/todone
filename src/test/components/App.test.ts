@@ -7,7 +7,7 @@ describe('App', () => {
     const wrapper = mount(App, {
       global: {
         stubs: {
-          ProductionBootstrap: { template: '<section data-testid="production-bootstrap" />' },
+          RouterView: { template: '<section data-testid="production-bootstrap" />' },
         },
       },
     });

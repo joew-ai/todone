@@ -88,6 +88,23 @@
       'invalidVersion': 'The profile version is invalid.',
       'conflict': 'This profile changed elsewhere. Review the latest version and try again.',
     },
+  'membershipApi':
+    {
+      'accessUnavailable': 'This account cannot access household information.',
+      'reauthenticationRequired': 'Your session needs to be refreshed. Sign in again.',
+      'internalError': 'We could not complete this request. Try again later.',
+    },
+  'cognitoAdministration':
+    {
+      'usernameConflict': 'The username is unavailable.',
+      'identityConflict': 'The identity attributes conflict.',
+      'userNotFound': 'The identity does not exist.',
+      'invalidPassword': 'The password does not meet policy.',
+      'invalidState': 'The identity is not in the required state.',
+      'throttled': 'The identity service rate limit was reached.',
+      'unavailable': 'The identity service is unavailable.',
+      'unknown': 'The identity operation failed.',
+    },
   'profileClient':
     {
       'sessionEnded': 'Your session ended. Sign in to continue.',

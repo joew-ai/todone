@@ -3,7 +3,13 @@ import { authenticateRequest } from '../shared/auth';
 import { handleObservedRequest } from '../shared/request';
 import { HttpStatus, json, unauthorizedResponse } from '../shared/responses';
 import type { TokenVerifier } from '../session/verifier';
-import { HouseholdRole, MembershipActivationState, PendingParentAction } from './constants';
+import {
+  HouseholdRole,
+  MembershipActivationState,
+  MembershipResolutionKind,
+  PendingParentAction,
+} from './constants';
+import { membershipResolutionFailureResponse } from './authorization';
 import type {
   CurrentMembership,
   FamilyDirectoryEntry,
@@ -29,8 +35,10 @@ export async function handler(
     if (!identity) return unauthorizedResponse(requestId);
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
-    if (!membership) return unauthorizedResponse(requestId);
+    const resolution = await repository.resolveMembership(identity.sub, identity.issuedAt);
+    if (resolution.kind !== MembershipResolutionKind.active)
+      return membershipResolutionFailureResponse(resolution, requestId);
+    const { membership } = resolution;
     const members = await repository.listFamilyMembers(membership.household.householdId);
     return json(HttpStatus.ok, { members: directoryForCaller(membership, members) });
   });

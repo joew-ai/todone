@@ -54,14 +54,12 @@ export function validateProfileInput(value: unknown): ProfileValidation {
     return unsupportedProfileFields();
   }
 
-  if (typeof value.displayName !== 'string') {
-    throw new Error('Profile display name must be a string.');
-  }
-  const displayName = value.displayName.trim();
+  const displayName = typeof value.displayName === 'string' ? value.displayName.trim() : '';
   const color = value.color;
   const version = value.version;
   const fieldErrors: ApiFieldError[] = [];
   if (
+    typeof value.displayName !== 'string' ||
     !displayName ||
     [...displayName].length > MAX_DISPLAY_NAME_LENGTH ||
     CONTROL_CHARACTER_PATTERN.test(displayName)

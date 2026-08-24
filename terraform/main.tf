@@ -1,6 +1,25 @@
 locals {
   app_name    = "todone"
   environment = "prod"
+  lambda_table_actions = [
+    "dynamodb:GetItem",
+    "dynamodb:PutItem",
+    "dynamodb:UpdateItem",
+    "dynamodb:DeleteItem",
+    "dynamodb:Query",
+    "dynamodb:BatchGetItem",
+    "dynamodb:BatchWriteItem",
+    "dynamodb:ConditionCheckItem",
+    "dynamodb:TransactGetItems",
+    "dynamodb:TransactWriteItems",
+  ]
+  family_account_cognito_actions = [
+    "cognito-idp:AdminCreateUser",
+    "cognito-idp:AdminDeleteUser",
+    "cognito-idp:AdminSetUserPassword",
+    "cognito-idp:AdminUpdateUserAttributes",
+    "cognito-idp:AdminUserGlobalSignOut",
+  ]
 }
 
 # Every family-paas module below is pinned to this reviewed commit
@@ -110,6 +129,61 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# Privileged family-account handlers use a separate role from ordinary session,
+# Membership, profile, and directory handlers. Future provisioning Lambdas must
+# opt into this role only after their application authorization checks are wired.
+resource "aws_iam_role" "family_account_admin_role" {
+  name = "${local.app_name}-family-account-admin-${local.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "family_account_admin_basic" {
+  role       = aws_iam_role.family_account_admin_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "family_account_cognito_admin" {
+  name = "${local.app_name}-cognito-family-account-admin-${local.environment}"
+  role = aws_iam_role.family_account_admin_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = local.family_account_cognito_actions
+      Resource = aws_cognito_user_pool.todone.arn
+    }]
+  })
+}
+
+# Family-account mutations also need the same dedicated application-table boundary as
+# ordinary handlers. Keep this policy separate from Cognito administration so review
+# can prove that neither permission set reaches an unrelated table or user pool.
+resource "aws_iam_role_policy" "family_account_table_access" {
+  name = "${local.app_name}-family-account-table-access-${local.environment}"
+  role = aws_iam_role.family_account_admin_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = local.lambda_table_actions
+      Resource = [
+        module.table.table_arn,
+        "${module.table.table_arn}/index/*",
+      ]
+    }]
+  })
+}
+
 resource "aws_iam_role" "pre_signup_role" {
   name = "${local.app_name}-pre-signup-${local.environment}"
 
@@ -160,18 +234,7 @@ resource "aws_iam_role_policy" "lambda_table_access" {
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
-      Action = [
-        "dynamodb:GetItem",
-        "dynamodb:PutItem",
-        "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem",
-        "dynamodb:Query",
-        "dynamodb:BatchGetItem",
-        "dynamodb:BatchWriteItem",
-        "dynamodb:ConditionCheckItem",
-        "dynamodb:TransactGetItems",
-        "dynamodb:TransactWriteItems",
-      ]
+      Action = local.lambda_table_actions
       Resource = [
         module.table.table_arn,
         "${module.table.table_arn}/index/*",

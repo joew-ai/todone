@@ -3,8 +3,16 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as createHousehold } from '../../../lambdas/households/create';
 import { handler as currentMembership } from '../../../lambdas/households/current';
 import { handler as familyDirectory } from '../../../lambdas/households/directory';
+import { readHandler as readProfile } from '../../../lambdas/households/profile';
 import { isResourceInHousehold } from '../../../lambdas/households/authorization';
 import { InMemoryHouseholdRepository } from '../../../lambdas/households/repository';
+import { MembershipRecordRepository } from '../helpers/membershipRecordRepository';
+import type {
+  CurrentMembership,
+  Household,
+  Membership,
+  MembershipLookup,
+} from '../../../lambdas/households/model';
 
 function event(method: 'GET' | 'POST', sub = 'sub-one', body?: unknown, key = 'request-one') {
   return {
@@ -17,10 +25,57 @@ function event(method: 'GET' | 'POST', sub = 'sub-one', body?: unknown, key = 'r
     requestContext: {
       requestId: 'safe-request-id',
       http: { method, path: '/', protocol: 'HTTP/1.1', sourceIp: '127.0.0.1', userAgent: 'test' },
-      authorizer: { jwt: { claims: { sub, 'cognito:username': 'parent' }, scopes: [] } },
+      authorizer: {
+        jwt: { claims: { sub, 'cognito:username': 'parent', iat: '1800000000' }, scopes: [] },
+      },
     },
     isBase64Encoded: false,
   } as unknown as APIGatewayProxyEventV2;
+}
+
+async function activeMembership(
+  repository: InMemoryHouseholdRepository,
+  sub: string,
+): Promise<CurrentMembership> {
+  const resolution = await repository.resolveMembership(sub, 1800000000);
+  if (resolution.kind !== 'active')
+    throw new Error(`Expected active membership, received ${resolution.kind}.`);
+  return resolution.membership;
+}
+
+function membershipRecords(overrides?: {
+  lookup?: Partial<MembershipLookup>;
+  household?: Partial<Household>;
+  membership?: Partial<Membership>;
+}) {
+  const household: Household = {
+    householdId: 'house-one',
+    name: 'River House',
+    timezone: 'America/Chicago',
+    createdAt: '2026-08-23T00:00:00.000Z',
+    version: 1,
+    ...overrides?.household,
+  };
+  const lookup: MembershipLookup = {
+    householdId: household.householdId,
+    memberId: 'member-one',
+    username: 'parent-one',
+    role: 'parent',
+    activationState: 'ACTIVE',
+    createdAt: '2026-08-23T00:00:00.000Z',
+    ...overrides?.lookup,
+  };
+  const membership: Membership = {
+    householdId: household.householdId,
+    memberId: lookup.memberId,
+    sub: 'sub-one',
+    username: lookup.username,
+    role: lookup.role,
+    activationState: lookup.activationState,
+    createdAt: '2026-08-23T00:00:00.000Z',
+    ...overrides?.membership,
+  };
+  return { lookup, household, membership };
 }
 
 describe('household bootstrap API and persistence', () => {
@@ -44,7 +99,7 @@ describe('household bootstrap API and persistence', () => {
       role: 'parent',
       household: { householdId: 'generated-id', name: 'River House', timezone: 'America/Chicago' },
     });
-    expect(await repository.getCurrentMembership('sub-one')).toMatchObject({ role: 'parent' });
+    expect((await activeMembership(repository, 'sub-one')).role).toBe('parent');
   });
 
   it('replays the same idempotent request but rejects changed input and a second bootstrap', async () => {
@@ -80,8 +135,8 @@ describe('household bootstrap API and persistence', () => {
     ]);
     expect(one.statusCode).toBe(201);
     expect(two.statusCode).toBe(201);
-    expect((await repository.getCurrentMembership('sub-one'))?.household.householdId).not.toBe(
-      (await repository.getCurrentMembership('sub-two'))?.household.householdId,
+    expect((await activeMembership(repository, 'sub-one')).household.householdId).not.toBe(
+      (await activeMembership(repository, 'sub-two')).household.householdId,
     );
   });
 
@@ -97,7 +152,7 @@ describe('household bootstrap API and persistence', () => {
       { repository },
     );
     expect(response.statusCode).toBe(422);
-    expect(await repository.getCurrentMembership('sub-one')).toBeNull();
+    expect((await repository.resolveMembership('sub-one')).kind).toBe('unattached');
     expect(response.body).not.toContain('target');
   });
 
@@ -125,10 +180,9 @@ describe('household bootstrap API and persistence', () => {
       name: 'One',
       timezone: 'America/Chicago',
     });
-    const membership = await repository.getCurrentMembership('sub-one');
-    expect(membership).not.toBeNull();
-    expect(isResourceInHousehold(membership!, membership!.household.householdId)).toBe(true);
-    expect(isResourceInHousehold(membership!, 'another-household')).toBe(false);
+    const membership = await activeMembership(repository, 'sub-one');
+    expect(isResourceInHousehold(membership, membership.household.householdId)).toBe(true);
+    expect(isResourceInHousehold(membership, 'another-household')).toBe(false);
   });
 
   it('creates and version-updates a member profile without accepting stale writes', async () => {
@@ -189,8 +243,7 @@ describe('household bootstrap API and persistence', () => {
       name: 'River House',
       timezone: 'America/Chicago',
     });
-    const membership = await repository.getCurrentMembership('sub-one');
-    if (!membership) throw new Error('Expected membership.');
+    const membership = await activeMembership(repository, 'sub-one');
     await repository.saveProfile({
       householdId: membership.household.householdId,
       memberId: membership.memberId,
@@ -215,5 +268,37 @@ describe('household bootstrap API and persistence', () => {
       ],
     });
     expect(response.body).not.toContain('sub-one');
+  });
+
+  it.each([
+    ['pending', membershipRecords({ lookup: { activationState: 'PENDING_ACTIVATION' } }), 403],
+    ['inactive', membershipRecords({ lookup: { activationState: 'INACTIVE' } }), 403],
+    [
+      'credential-stale',
+      membershipRecords({ lookup: { credentialsValidAfter: '2028-01-01T00:00:00.000Z' } }),
+      401,
+    ],
+    ['inconsistent', membershipRecords({ membership: { role: 'child' } }), 500],
+  ])(
+    'does not treat a %s Membership as an unattached account',
+    async (_state, records, statusCode) => {
+      const repository = new MembershipRecordRepository('sub-one', records);
+
+      const response = await currentMembership(event('GET'), { repository });
+      expect(response.statusCode).toBe(statusCode);
+      expect(response.body).not.toContain('River House');
+      expect(response.body).not.toContain('membership":null');
+    },
+  );
+
+  it('denies non-active Membership before profile data reads', async () => {
+    const repository = new MembershipRecordRepository(
+      'sub-one',
+      membershipRecords({ lookup: { activationState: 'PENDING_ACTIVATION' } }),
+    );
+
+    const response = await readProfile(event('GET'), { repository });
+    expect(response.statusCode).toBe(403);
+    expect(response.body).not.toContain('profile');
   });
 });

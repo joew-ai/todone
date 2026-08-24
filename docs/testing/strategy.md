@@ -85,8 +85,14 @@ Required suites include:
 - Valid, missing, malformed, expired, wrong-issuer, and wrong-audience JWTs.
 - Exact `GET /api/v1/session` response and `no-store` behavior.
 - Membership bootstrap idempotency and one-household-per-user concurrency.
+- Typed Membership resolution for unattached, active, pending, inactive, credential-stale, and
+  inconsistent lookup/Household/member records, including missing and boundary-second token `iat`.
 - Every authorization-matrix allow/deny boundary, including inactive membership and cross-household opaque IDs.
 - Cognito administration adapters with secret-safe failures and pool-scoped calls.
+- Pending-parent self activation, atomic activation-copy transition, repeated activation, and proof
+  that an active peer cannot supply a target identity to activate another parent.
+- Family-account endpoint status/error/idempotency contracts, including confirmed replay only,
+  non-replayed password reset, and manual-operator ownership after induced Cognito/DynamoDB splits.
 - Conditional Todo lifecycle races and no false duplicate outcomes.
 - Query projection maintenance and no active/history overlap.
 - Full child-removal cascade for every deployed child-associated entity and restricted audit record.
@@ -105,6 +111,8 @@ Critical flows run through the browser against a local application and local API
 
 - Production registration gate including closed registration, Cognito email confirmation/resend, sign-in, current-tab restoration from `sessionStorage`, Forgot Password, sign-out, household creation, and onboarding. Browser tests assert that tokens never enter `localStorage`, IndexedDB, URLs, or service-worker caches.
 - Parent member creation/reset/removal and self-profile editing.
+- Pending-parent setup-code activation, built-in Cognito invitation resend/change/cancel, and
+  parent-only recovery-email replacement while the previous verified value remains active.
 - Canonical route guards, Back/Forward, reload/deep links, secret-free history, and the pre-Todo child `/todos` landing. The placeholder test proves that it makes no Todo API request and exposes no Todo action.
 - Parent Todo assignment, child completion, parent history, undo/reopen, archive/restore, and delete confirmation/cancellation.
 - Label selection/creation/filtering and recurrence current/history behavior as those capabilities ship.
@@ -124,11 +132,22 @@ Before product-owner review of a changed UI slice, the implementing engineer sup
 
 Each protected operation has tests for missing authentication, wrong role, another member where relevant, another household, inactive/removed membership, malformed/extra ownership fields, stale versions, and forbidden lifecycle states. Security tests assert both denial and absence of side effects/data disclosure.
 
+Membership-resolution tests must use a seam that can independently model lookup, Household, and
+household Membership records. An in-memory repository that always returns an active simplified
+membership is insufficient evidence for activation, cutoff, mismatch, corruption, or removal.
+
 Log-capture tests seed recognizable canary secrets and private values, induce failures, and assert those values are absent from logs, metrics, errors, URLs, caches, and built browser assets.
 
 ### Recovery and infrastructure tests
 
 The `family-paas` owner proves the reviewed plan, least-privilege IAM, Cognito issuer/audience, dedicated table, on-demand billing, encryption, PITR, and rollback outputs. The Todone operator periodically follows the separate-table PITR restore drill in `docs/operations/backup-restore.md` and records item counts, sample access-pattern queries, authorization invariants, and disposal.
+
+The Cognito administration adapter is unit-tested with a command-recording client and a typed
+deterministic fake. Tests assert the exact child/parent delivery flags and attributes, permanent
+password and lifecycle commands, stable safe error taxonomy, and absence of raw dependency
+messages, metadata, private inputs, or logging. Terraform validation and a reviewed plan must show
+the five approved actions scoped to the Todone pool ARN on the separate family-account role, with
+no Cognito administration policy attached to ordinary Lambda handlers.
 
 ## Test data and isolation
 

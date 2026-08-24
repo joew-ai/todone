@@ -19,8 +19,8 @@ The following key families are canonical logical prefixes. An implementation may
 | Item | Primary key family | Required attributes and invariants |
 | --- | --- | --- |
 | Household | `pk=HOUSEHOLD#<householdId>`, `sk=HOUSEHOLD` | Name, valid IANA timezone, created timestamp, version. |
-| User membership lookup | `pk=USER#<sub>`, `sk=MEMBERSHIP` | Household ID, member ID, immutable canonical username and role, activation state. At most one active household per `sub`. |
-| Membership | `pk=HOUSEHOLD#<householdId>`, `sk=MEMBER#<memberId>` | Cognito `sub`, immutable canonical username and `parent` or `child` role, activation state, optional credential-validity cutoff, creation timestamp. |
+| User membership lookup | `pk=USER#<sub>`, `sk=MEMBERSHIP` | Household ID, member ID, immutable canonical username and role, activation state, optional `credentialsValidAfter`, and creation timestamp. At most one household identity per `sub`. The cutoff has no duplicate copy. New writes include `createdAt`; the first-parent bootstrap lookup shape that predates it remains read-compatible. |
+| Membership | `pk=HOUSEHOLD#<householdId>`, `sk=MEMBER#<memberId>` | Cognito `sub`, immutable canonical username and `parent` or `child` role, activation state, and creation timestamp. Username, role, and activation are deliberate directory/authorization copies and must match the lookup; credential cutoff is not duplicated here. |
 | Profile | `pk=HOUSEHOLD#<householdId>`, `sk=PROFILE#<memberId>` | Mutable non-unique display name and palette color. No credential or recovery email. |
 | Todo | `pk=HOUSEHOLD#<householdId>`, `sk=TODO#<todoId>` | Title, scalar assignee member ID, optional date-only due value, lifecycle, version, creation and completion metadata, optional label ID, and optional recurrence provenance. |
 | Label | `pk=HOUSEHOLD#<householdId>`, `sk=LABEL#<labelId>` | Trimmed display name and case-folded comparison key, unique within the household. |
@@ -33,7 +33,8 @@ The logical prefixes do not permit direct string concatenation from unvalidated 
 
 | Access pattern | Authorization and query requirement |
 | --- | --- |
-| Resolve current membership by JWT `sub` | Strongly read `USER#<sub>/MEMBERSHIP`, then the referenced household Membership; reject absent, inactive, pending, or inconsistent lookup/Membership data. Do not accept a household ID from the client as a substitute. |
+| Resolve current membership by JWT `sub` | Strongly read `USER#<sub>/MEMBERSHIP`, then the referenced Household and household Membership. Return a typed `UNATTACHED`, `ACTIVE`, `PENDING_ACTIVATION`, `INACTIVE`, `CREDENTIALS_STALE`, or `INCONSISTENT` outcome. Validate matching keys, IDs, `sub`, username, role, activation, required attributes, and token `iat > credentialsValidAfter`. Do not accept a household ID from the client as a substitute. |
+| Activate a pending parent | By verified caller `sub`, strongly read the pending lookup and referenced pending household Membership, validate that both describe the same parent, mark the already-configured Cognito email verified after setup-code possession, and transact both activation copies from `PENDING_ACTIVATION` to `ACTIVE`. No client household/member/role/email value participates. |
 | Bootstrap one household for an unattached user | Condition that no user lookup exists, and atomically or idempotently create Household, initial parent Membership, and lookup. Concurrent retries produce one household. Profile data is introduced by the later family-account capability. |
 | Read household and current member | Use household ID obtained from the active lookup, then keyed reads. |
 | List active household members | Query the household member key range; exclude inactive or partially provisioned members. |
@@ -71,6 +72,8 @@ Recurrence storage MUST support discovery of templates eligible for a server-sid
 - A self-registered unattached identity can create exactly one household. Later household accounts are parent-provisioned.
 - Role is set when Membership is created and is immutable. Parent removal/demotion and role mutation are not supported.
 - An inactive or deleted Membership fails authorization even if a previously issued JWT remains cryptographically valid.
+- `credentialsValidAfter` is a UTC RFC 3339 instant stored only on the user-membership lookup. It is the canonical Cognito-identity session gate because every household request begins with that `sub`-keyed read. When present, a verified token without numeric `iat`, or with `iat` at or before the cutoff, resolves as `CREDENTIALS_STALE`; household Membership does not duplicate the value.
+- Lookup and household Membership deliberately duplicate immutable username, immutable role, and activation state to support identity resolution and household directory access. Resolution validates equality rather than trusting either copy independently. Pending-parent activation changes both activation copies in one transaction.
 
 ### Todo lifecycle
 
@@ -88,7 +91,7 @@ A Todo stores zero or one label ID, never a label-name snapshot. A Label stores 
 
 - Server timestamps are UTC RFC 3339 instants. Date-only fields are validated separately and are never converted from a client timestamp.
 - Creation operations that can be retried after an uncertain response use an idempotency key or a deterministic uniqueness condition.
-- Multi-item invariants use `TransactWriteItems` or an equivalent design with explicit idempotent repair behavior.
+- DynamoDB-only multi-item invariants use `TransactWriteItems` or an equivalent conditional design. Cognito/DynamoDB split outcomes are not automatically repaired: they fail generically and remain operator-owned until manual cleanup.
 - A client-supplied version is required for mutable versioned records. Conditional failure does not silently overwrite newer state.
 - Repository return types distinguish not found, unauthorized, conflict, invalid state, and dependency failure without exposing cross-household existence.
 

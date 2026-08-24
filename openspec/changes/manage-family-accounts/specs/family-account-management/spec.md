@@ -1,5 +1,29 @@
 ## ADDED Requirements
 
+### Requirement: Explicit Membership Resolution
+The application SHALL distinguish a genuinely unattached authenticated identity from an active,
+pending, inactive, credential-stale, or persistence-inconsistent Membership. Ordinary household
+APIs SHALL authorize only a strongly validated active lookup, Household, and household Membership
+whose member ID, `sub`, immutable username, immutable role, and activation copies agree. The sole
+credential-validity cutoff SHALL be stored on the `USER#<sub>/MEMBERSHIP` lookup, and a token with
+missing `iat` or `iat` at or before that cutoff SHALL NOT authorize household access.
+
+#### Scenario: Unattached identity resolves current membership
+- **WHEN** an authenticated first-parent identity has no user-membership lookup
+- **THEN** current-Membership returns `membership: null` and the client may offer household setup
+
+#### Scenario: Non-active identity resolves current membership
+- **WHEN** the lookup or household Membership is pending or inactive
+- **THEN** current-Membership does not return `membership: null` or household data and the client does not offer creation of a second household
+
+#### Scenario: Stored Membership is inconsistent
+- **WHEN** lookup, Household, and household Membership data is malformed, missing after reference, or disagrees on an invariant
+- **THEN** authorization fails closed with a generic request-ID error and a non-identifying operator consistency outcome rather than treating the identity as unattached or disclosing stored values
+
+#### Scenario: Token predates child credential cutoff
+- **WHEN** a household request carries a token whose `iat` is missing or not later than the lookup's `credentialsValidAfter`
+- **THEN** the request requires reauthentication before reading household or target data
+
 ### Requirement: Parent-Provisioned Members
 Any parent SHALL be able to create a child or parent account in their household using a globally unique, case-insensitive, immutable username, a non-unique display name, a profile color, and an immutable selected role. Usernames SHALL be normalized to lowercase, contain 3-24 characters using only `a-z`, `0-9`, `-`, and `_`, allow any permitted character at the beginning or end, and be stored on Membership as an immutable read copy while Cognito remains the uniqueness authority. A child account SHALL use a parent-supplied initial password and SHALL NOT require email. A parent account SHALL require an email address, prove control of it by completing the emailed one-time setup-code flow, and select their own password before activation.
 
@@ -13,7 +37,11 @@ Any parent SHALL be able to create a child or parent account in their household 
 
 #### Scenario: Additional parent activates
 - **WHEN** the pending parent supplies their username, emailed one-time setup code, and a valid self-selected password
-- **THEN** Cognito completes the required first-sign-in challenge, the Membership becomes active, and the verified email supports Forgot Password recovery
+- **THEN** Cognito completes the required first-sign-in challenge and issues a new token, after which the self-only activation API validates the caller's matching pending records, marks the already-configured Cognito email verified, atomically activates both Membership copies, and returns the ordinary active Membership
+
+#### Scenario: Existing parent attempts to activate a pending peer
+- **WHEN** an active parent calls the activation API with a target identifier or another parent's pending state
+- **THEN** the request is rejected before mutation because activation accepts only the verified pending caller and no target identity
 
 #### Scenario: Parent manages a pending parent
 - **WHEN** an active parent views a pending parent in family management
@@ -35,7 +63,7 @@ Every parent SHALL have equal authority to manage Todos and child accounts. The 
 - **THEN** the API denies the request and the peer parent remains active
 
 ### Requirement: Child Password Reset
-A parent SHALL be able to set a new permanent password for a child account in their household. The new password SHALL never be persisted or logged by Todone. A successful reset SHALL globally sign out the child's Cognito sessions and advance a server-side credential-validity cutoff so previously issued JWTs cannot continue to authorize household APIs.
+A parent SHALL be able to set a new permanent password for a child account in their household. The new password SHALL never be persisted or logged by Todone. A successful reset SHALL globally sign out the child's Cognito sessions and advance the server-side credential-validity cutoff on that child's user-membership lookup so previously issued JWTs cannot continue to authorize household APIs.
 
 #### Scenario: Child reset succeeds
 - **WHEN** a parent submits a valid replacement password for a household child
@@ -121,11 +149,21 @@ Public first-parent signup SHALL require the Entry Code only for Cognito `PreSig
 - **THEN** the pool-scoped runtime may invoke `AdminCreateUser` and the pre-signup trigger does not require the public Entry Code
 
 ### Requirement: Branded Parent Welcome Email
-Additional-parent creation and resend SHALL use reviewed application-owned plain-text and HTML welcome-email copy delivered by Cognito through SES developer email. The message SHALL contain Cognito's username and one-time setup-code placeholders, explain the shared account-password requirements, and direct the parent to the activation route without placing username, email, setup code, password, or another secret in the URL. The deployment SHALL NOT add dedicated IPs or a fixed-price SES plan for this capability.
+Additional-parent creation and resend SHALL use reviewed application-owned HTML welcome-email copy
+in Cognito's static invitation template and Cognito's built-in email delivery. The message SHALL
+contain `{username}` and `{####}`, present the temporary password as a one-time setup code, explain
+the shared account-password requirements, and direct the parent to `/activate-parent` without
+placing username, email, setup code, password, or another secret in the URL. This private deployment
+accepts Cognito's 50-message daily account quota and SHALL NOT add an SES developer configuration,
+custom-message/custom-sender Lambda, dedicated IP, or paid email plan for this capability.
 
 #### Scenario: Pending parent receives welcome email
 - **WHEN** Cognito sends or resends an additional-parent welcome message
 - **THEN** the parent receives branded setup instructions and a one-time code without secret values entering application logs or URLs
+
+#### Scenario: Built-in daily email quota is exhausted
+- **WHEN** Cognito refuses a welcome or verification message because the built-in daily quota is exhausted
+- **THEN** the application reports that delivery could not be confirmed without exposing the address or code and does not silently switch to an unreviewed sender
 
 ### Requirement: Child Account Removal
 A parent SHALL be able to permanently remove a child account only after explicit confirmation describing the deletion consequences. Removal SHALL use an extensible cascade that deletes the child's Cognito identity, Membership, profile, and every child-associated data type known to the deployed application. Each later capability that introduces child-associated records SHALL extend this cascade before that capability is complete. The globally unique username SHALL become reusable only after the complete deployed cascade succeeds. The application SHALL NOT retain the child's name, color, `sub`, credentials, or user-visible historical identity.
@@ -143,8 +181,13 @@ A parent SHALL be able to permanently remove a child account only after explicit
 - **THEN** the child identity, profile, Membership, and every child-associated record known to the deployed application are deleted and the username may be registered again as a new unrelated identity
 
 ### Requirement: Provisioning Repair Runbook
-Todone SHALL NOT build parent-facing repair UI or monitoring for partial Cognito and application-data provisioning failures. The operations documentation SHALL define how an authorized operator detects and repairs or deletes orphaned users with AWS or CLI tools without logging credentials.
+Todone SHALL NOT build parent-facing repair UI, automatic cross-service repair, or monitoring for
+partial Cognito and application-data provisioning failures. The operations documentation SHALL
+define how an authorized operator detects and deletes or repairs orphaned users with AWS or CLI
+tools without logging credentials. Product retries SHALL replay only a confirmed completed result;
+an uncertain split result SHALL block username reuse or a repeated destructive transition until
+the operator resolves it.
 
 #### Scenario: Provisioning partially fails
 - **WHEN** Cognito identity creation and Todone membership creation do not both complete
-- **THEN** the parent receives a generic failure, and an authorized operator can follow the documented repair procedure before the username is retried
+- **THEN** the parent receives a generic request-ID failure without a claim that retry is safe, and an authorized operator follows the documented repair procedure before the username is retried

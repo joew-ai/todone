@@ -1,4 +1,8 @@
-import type { PendingParentAction, ProfileColorId } from './constants';
+import {
+  MembershipResolutionKind,
+  type PendingParentAction,
+  type ProfileColorId,
+} from './constants';
 
 export type MembershipRole = 'parent' | 'child';
 export type MembershipActivationState = 'ACTIVE' | 'PENDING_ACTIVATION' | 'INACTIVE';
@@ -19,8 +23,18 @@ export interface Membership {
   username: string;
   role: MembershipRole;
   activationState: MembershipActivationState;
-  credentialsValidAfter?: string;
   createdAt: string;
+}
+
+export interface MembershipLookup {
+  householdId: string;
+  memberId: string;
+  username: string;
+  role: MembershipRole;
+  activationState: MembershipActivationState;
+  credentialsValidAfter?: string;
+  /** Optional only for first-parent lookups written before family-account metadata existed. */
+  createdAt?: string;
 }
 
 export interface CurrentMembership {
@@ -29,6 +43,15 @@ export interface CurrentMembership {
   role: MembershipRole;
   household: Pick<Household, 'householdId' | 'name' | 'timezone'>;
 }
+
+/** A fail-closed result for the verified caller's lookup, Household, and Membership records. */
+export type MembershipResolution =
+  | { kind: (typeof MembershipResolutionKind)['unattached'] }
+  | { kind: (typeof MembershipResolutionKind)['active']; membership: CurrentMembership }
+  | { kind: (typeof MembershipResolutionKind)['pendingActivation'] }
+  | { kind: (typeof MembershipResolutionKind)['inactive'] }
+  | { kind: (typeof MembershipResolutionKind)['credentialsStale'] }
+  | { kind: (typeof MembershipResolutionKind)['inconsistent'] };
 
 export interface Profile {
   memberId: string;
@@ -79,7 +102,7 @@ export type BootstrapResult =
   | { kind: 'idempotency-conflict' };
 
 export interface HouseholdRepository {
-  getCurrentMembership(sub: string, tokenIssuedAt?: number): Promise<CurrentMembership | null>;
+  resolveMembership(sub: string, tokenIssuedAt?: number): Promise<MembershipResolution>;
   bootstrap(input: BootstrapInput): Promise<BootstrapResult>;
   getProfile(householdId: string, memberId: string): Promise<Profile | null>;
   saveProfile(input: SaveProfileInput): Promise<SaveProfileResult>;

@@ -1,5 +1,7 @@
 # Product Critique: `manage-family-accounts`
 
+> **This document is a Point in Time critique - it does not reflect updates to the plan nor implementation.**
+
 Reviewer: independent product/architecture review
 Scope: pre-implementation review of `proposal.md`, `design.md`, `specs/family-account-management/spec.md`, `tasks.md`, cross-referenced against `docs/product/brief.md` and sibling OpenSpec changes (`bootstrap-household-membership`, `complete-first-family-todo`). No implementation exists yet; no code was reviewed.
 

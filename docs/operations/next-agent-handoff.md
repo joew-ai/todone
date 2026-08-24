@@ -1,62 +1,167 @@
-# Next-agent handoff: visual foundation next
+# Next-agent handoff: Cognito administration and IAM foundation
 
-## Current status
+## Goal of the next changeset
 
-`bootstrap-household-membership` and `clarify-registration-password-requirements` are complete. The human release owner previously applied the reviewed bootstrap infrastructure, deployed its reviewed artifacts, and completed the authorized production smoke. Do not repeat Terraform apply or production smoke unless explicitly asked.
+The identity-administration foundation is complete: `manage-family-accounts` tasks 2.2–2.3 add the typed Cognito adapter and a separate pool-scoped family-account Lambda role. No provisioning endpoint calls the adapter yet.
 
-`manage-family-accounts` has completed its profile/directory and route-foundation slices:
+The next infrastructure slice is tasks 2.4–2.5: configure Cognito's static welcome template, built-in sender, retained verified-email behavior, and browser app-client attribute restrictions. After that, implement one provisioning vertical slice using the adapter only after application authorization.
 
-- 2.1: the Cognito pre-signup trigger has explicit public-signup versus administrative-create policy and tests.
-- 3.1: Profile persistence plus self-only versioned read/update API are complete.
-- 3.2: an active first parent with no Profile is required to complete display-name/color setup before family management.
-- 3.3: the active/pending family directory returns deterministic, household-safe data and caller-allowed pending-parent actions.
-- 3.4: `vue-router` owns canonical page-level navigation, guard redirects, document titles, and destination-heading focus. Public auth routes are secret-free; authenticated guards resolve session, Membership, and Profile before rendering. Active children with a Profile land on `/todos`, an intentionally nonfunctional work-in-progress page with no Todo API call, data, or actions; parents retain `/family` as the current useful home.
-- 7.0: approved local command families are documented in `AGENTS.md` and implemented by `.codex/rules/default.rules`.
+Do not deploy or apply the reviewed IAM plan. No SES configuration, custom-message Lambda, member provisioning endpoint, or product UI was added by tasks 2.2–2.3.
 
-The completed family-account work is committed locally. It has not been separately deployed in this handoff; do not infer deployment or Terraform-apply authorization from the commits or artifact-hash updates.
+## Current state
 
-## Start with this change
+The working tree contains owner-approved uncommitted documentation changes that should be included
+with the next implementation commit. The completed visual/family-directory changes are in commit
+`6d0e713` (`pretty UI for family management`). No production deployment is implied by that commit.
 
-The next dependency is `openspec/changes/establish-visual-design-foundation/`.
+Completed `manage-family-accounts` work:
 
-Read its proposal, design, task list, and capability spec in full before editing. `manage-family-accounts` task 3.4 is complete; visual-foundation tasks 1.1–2.3 are complete, and the accepted reference is `docs/ux/references/visual-design-foundation.html`. The accepted direction uses authored CSS custom properties as the visual source of truth, Tailwind aliases for ergonomic utilities, `@lucide/vue` imported icon-by-icon, a retained quick HTML reference page under `docs/ux/references/` for pre-implementation human review, and real-app UX journeys for post-implementation product-owner testing. Do not use Tailwind's stock palette as the product language or direct profile hex values as large UI fills.
+- 1.1: reconciled Membership-state, endpoint/error/idempotency, activation, manual-repair, recovery-email, removal, and built-in Cognito email-delivery contracts.
+- 2.1: explicit pre-signup trigger-source policy.
+- 2.2: typed Cognito administration adapter with deterministic fake boundary and safe error taxonomy.
+- 2.3: separate family-account runtime role with five pool-scoped Cognito actions and Todone-table-only data access.
+- 3.1–3.3: self-only Profiles and the household-safe family directory.
+- 3.4: canonical `vue-router` navigation and the child `/todos` placeholder.
+- 3.5–3.6: accepted family-account HTML reference and responsive family/profile implementation.
+- 7.0: approved local command families.
 
-Visual-foundation tasks 3.1–3.5 remain open. Automated route/a11y coverage and compact/wide screenshot review are complete, but long-content 320-pixel reflow, 200-percent zoom, keyboard/screen-reader/forced-colors review, ambient-motion profiling, and the final verification reconciliation must be recorded before calling the foundation fully complete.
+Tasks 1.2–1.6 are complete. The implementation uses a typed fail-closed resolution across DynamoDB and the in-memory test repository; unit and integration tests cover active, pending, inactive, stale-cutoff, malformed, and mismatched records as well as parent/child/cross-household target rules.
 
-`manage-family-accounts` task 3.4 is complete; tasks 3.5–3.6 remain intentionally open:
+The separate `establish-visual-design-foundation` change has implementation tasks 1.1–2.3 complete. Its manual/final verification tasks 3.1–3.5 remain unchecked. They are not part of this backend changeset and must not be silently marked complete.
 
-- 3.5 must produce a quick self-contained route-level family-account HTML reference under `docs/ux/references/`, obtain human review before final implementation, and retain the accepted page as a decision reference.
-- 3.6 must restyle/complete family-management and self-profile UI only after those prerequisites.
+## Existing architecture to preserve
 
-Do not mark broader family-account tasks 1.1–1.6, 2.2–2.5, or 4–7 complete merely because their early supporting code exists. Their checkboxes and completion criteria remain authoritative.
+### Identity and trust boundary
 
-## Existing behavior and boundaries to preserve
+- Cognito authenticates a global immutable username and supplies verified `sub`, username, and token `iat`. Username is a display/read copy, never an ownership key.
+- Every household API derives the caller from the verified token and resolves `USER#<sub>/MEMBERSHIP`; it never accepts client-owned `sub`, household, member, role, activation state, or credential cutoff.
+- Household scope comes only from the resolved active Membership. Cross-household and hidden targets use the same safe result as absence.
+- Roles are immutable `parent` or `child`. Activation states are `ACTIVE`, `PENDING_ACTIVATION`, and `INACTIVE`. All parents are peers; the product has no parent removal, demotion, peer password reset, or peer profile-edit operation.
+- Pending and inactive members have no household authority. An existing JWT is insufficient once Membership becomes inactive or its credential-validity cutoff rejects the token's `iat`.
+- Membership resolution has typed `UNATTACHED`, `ACTIVE`, `PENDING_ACTIVATION`, `INACTIVE`, `CREDENTIALS_STALE`, and `INCONSISTENT` outcomes. Only a truly absent lookup produces `200 {"membership": null}`; other states are never routed to second-household setup.
+- Additional-parent activation is the one narrow exception to active-Membership authorization: after Cognito completes `NEW_PASSWORD_REQUIRED`, `POST /api/v1/parent-activations` derives the pending identity only from the verified caller and atomically activates both Membership copies.
 
-- Cognito session material is tab-scoped in `sessionStorage`; it must not move to `localStorage`, IndexedDB, URLs, app data, or service-worker caches.
-- First-parent registration uses an Entry Code only through `PreSignUp_SignUp`; `PreSignUp_AdminCreateUser` is an independent, IAM-authorized future parent-provisioning path. Never assume one trigger follows the other.
-- Local `cognito-local` does not execute the deployed pre-signup Lambda. Local browser registration therefore does not validate the Entry Code; see `docs/testing/strategy.md` for the documented limitation. Do not present that bypass as production behavior.
-- Local Cognito confirmation/recovery codes appear in the Cognito emulator console. `npm run setup:local-cognito` is idempotent and updates an existing pool for local email-code delivery.
-- The local API must stay alive under `npm run dev:full`; `local-dev/server.ts` deliberately retains a timer handle and closes cleanly on `SIGINT`/`SIGTERM` because the current `tsx` process otherwise exits after listener setup.
-- Household authorization derives scope from verified membership, never client-supplied household/member identifiers. Profiles are self-only; the family directory never returns recovery email, Cognito status/details, raw `sub`, or household details.
-- The canonical profile palette lives in `shared/profilePalette.ts`; browser and Lambda code import the same stable identifiers. Profile color is always paired with member name and never represents authorization or status.
-- Lambda-facing user/API messages load through `lambdas/shared/messages.ts`; the Lambda build copies `src/i18n/en.yml` into each artifact. Keep internal diagnostics local and do not return/log them raw.
-- `lambdas/shared/request.ts` records request ID/outcome for successful and failed completed responses. Logs and metrics must remain free of credentials, Entry Codes, emails, usernames, Cognito `sub`, tokens, household names, profile values, and raw request bodies.
+### Persistence boundary
 
-## Important implementation locations
+- `lambdas/households/model.ts` defines the repository-facing domain types.
+- `lambdas/households/keys.ts` owns DynamoDB key construction.
+- `lambdas/households/repository.ts` contains both DynamoDB and in-memory implementations. Production membership resolution strongly reads the lookup, household, and household Membership.
+- DynamoDB and in-memory repositories both resolve the full lookup, Household, and Membership tuple. Any malformed or inconsistent stored state is fail-closed; an absent lookup is the only `UNATTACHED` result.
+- The in-memory repository has a test-only record seeding seam that models pending, inactive, cutoff, and inconsistent state without bypassing request authentication or handler authorization.
+- Username and role are already copied to the lookup and household Membership during first-parent bootstrap. The directory reads username from Membership and makes no per-member Cognito call.
+- The first-parent bootstrap lookup shape may lack the later `createdAt` metadata. Preserve read compatibility for that known legacy shape; new lookup writes include it, and no data migration is required for its absence alone.
+- Profiles are self-only, versioned records. The canonical profile palette is shared from `shared/profilePalette.ts` and re-exported through household constants.
 
-- `src/components/ProductionBootstrap.vue` renders the established auth/bootstrap/profile/family route surfaces. Its transient loading/error state is component-local, but page-level navigation is router-owned; do not reintroduce component-local page switching or extend it for later account surfaces.
-- `src/router/routes.ts` owns the stable route names and paths; `src/router/index.ts` owns route records, safe guard normalization, and document titles. Keep secrets, identities, and mutation values out of route params, queries, fragments, and history state.
-- `src/components/TodoPlaceholder.vue` is the deliberate pre-Todo child landing page. Do not add data access, controls, or simulated Todo behavior before the Todo vertical slice.
-- `src/assets/main.css` is the visual source of truth for semantic and profile tonal CSS custom properties plus shared primitive classes; `tailwind.config.js` maps only semantic aliases to them. `src/presentation/profileTone.ts` applies the reviewed profile family through `data-profile-color`, while `appContext.ts` provides the role-aware shell context. Do not return to direct profile hex fills or stock Tailwind application colors.
-- `@lucide/vue` is the accepted outline-icon dependency and the maintained successor to the initially selected package. Import individual icons, use semantic inherited color, keep visible labels where useful, and do not import the complete catalog dynamically.
-- `src/services/apiClient.ts` owns shared authenticated browser request construction. `profileClient.ts` and `familyClient.ts` build on it.
-- `lambdas/households/constants.ts`, `keys.ts`, `model.ts`, `repository.ts`, and `runtime.ts` own durable family-account vocabulary, storage, and production repository construction. Handlers receive repository overrides for tests/local development.
-- `docs/architecture/api-conventions.md`, `docs/security/authorization-matrix.md`, `docs/ux/interaction-states.md`, and `docs/ux/responsive-accessibility.md` are the cross-cutting contracts to preserve.
+### Request and error boundary
 
-## Verification and release
+- Handlers authenticate with `lambdas/shared/auth.ts`, then use `handleObservedRequest` and shared response helpers. Keep request IDs and coarse outcomes for success and failure.
+- User-facing API copy and stable external identifiers belong in `src/i18n/en.yml` and the shared message/response catalogs. Raw AWS errors and internal consistency diagnostics never reach users.
+- Logs and metrics must exclude credentials, codes, tokens, emails, usernames, `sub`, household/member IDs, household/profile values, and raw bodies.
+- Authorization must precede domain reads that could reveal private data and must precede every future Cognito administration call.
 
-At this handoff, `npm run verify-local`, `npm run test:e2e` (50 tests), and `npm run test:a11y` (20 tests) pass. Compact and wide production screenshots were manually reviewed. Route coverage proves signed-out protected-route normalization, child `/todos` landing without Todo traffic, direct verification without identity in the URL, profile navigation with Back, registration Back/Forward without restored secret fields, titles, destination focus, role-appropriate application navigation, and applied profile tone. The bootstrap browser fixture continues to cover the profile-setup transition and mocks the profile/directory APIs at the HTTP boundary.
+## Remaining work
 
-Use `npm run verify-local` for non-browser verification, then run the relevant Playwright and accessibility suites for changed UI. Before asking the project owner to test manually, start the same local stack, perform an automated browser smoke where possible, and provide concise UX journeys naming setup, route/actions, and expected results for direct testing in the real app. Update OpenSpec task status and this handoff at the end of every bounded slice.
+Tasks 2.4–2.5 own the remaining Cognito configuration. They configure the source-controlled static invitation template and built-in delivery, retain the old verified recovery email until replacement verification, and restrict browser email writes. No SES custom sender is planned. The first application vertical slice should follow only after that infrastructure contract is complete.
 
-Never deploy, apply Terraform, alter production infrastructure, or run a production smoke without explicit user authorization.
+## Suggested file-level plan
+
+1. Implement and validate tasks 2.4–2.5 without apply.
+2. Choose one complete child or pending-parent provisioning flow and wire authorization before adapter access.
+3. Assign only privileged family-account mutation Lambdas to `family_account_admin_role_arn`; ordinary Lambdas retain the non-Cognito runtime role.
+
+Prefer a small explicit API such as “resolve active membership,” “require active parent,” and operation-specific same-household target predicates over a generic policy engine. Keep authorization control flow explicit; do not encode security decisions in terse conditional expressions.
+
+## Questions and review points
+
+No product-owner decision is currently required to start tasks 2.4–2.5. If implementation exposes a materially different choice, pause and update the OpenSpec contracts before coding it.
+
+Review these points carefully:
+
+- Future handlers must authorize caller and target before resolving or invoking the adapter.
+- Only privileged mutation Lambdas may use the family-account role; do not move session, Membership, profile, or directory handlers onto it.
+- Adapter errors contain only a stable operation and safe failure kind. Never retain or log the AWS exception, metadata, username, email, password, or Cognito `sub`.
+- `AdminUpdateUserAttributes` is shared deliberately by pending-email replacement and post-challenge email verification. Do not add a broader attribute-management operation.
+
+## Verification and release boundary
+
+Run at minimum:
+
+```sh
+npm run format:check
+npm run lint:check
+npm run typecheck
+npm run test:unit
+npm run test:integration
+npm run build
+npm run build:lambdas
+npx openspec validate manage-family-accounts --strict
+git diff --check
+```
+
+Use `npm run verify-local` as the aggregate non-browser check. Browser and accessibility suites are required only if this slice changes route/UI behavior; ideally it should not. Add focused security-negative tests for every authorization path changed.
+
+For tasks 2.2–2.3, `terraform validate` passed and the saved targeted plan at
+`/tmp/todone-family-admin.tfplan` showed four additions, zero destruction, and zero replacement:
+the dedicated role, basic logging attachment, five-action pool-scoped Cognito policy, and
+Todone-table-only policy. Because the real sensitive registration-gate variable was intentionally
+unavailable, the plan used a non-secret placeholder and also displayed an unrelated pre-signup
+Lambda in-place update from the existing artifact/config drift. Do not apply that saved plan; a
+release owner must produce a full plan with the real secret input and reviewed artifact hashes.
+
+Do not deploy, apply Terraform, alter production infrastructure, create real Cognito users, or run a production smoke without explicit human authorization. Infrastructure tasks 2.4–2.5 remain a separately reviewed later slice within the `family-paas` boundary.
+
+## Files to load before starting
+
+Load these in order.
+
+### Instructions and active change
+
+- `AGENTS.md`
+- `docs/operations/next-agent-handoff.md`
+- `openspec/changes/manage-family-accounts/proposal.md`
+- `openspec/changes/manage-family-accounts/design.md`
+- `openspec/changes/manage-family-accounts/tasks.md`
+- `openspec/changes/manage-family-accounts/specs/family-account-management/spec.md`
+
+### Cross-cutting contracts
+
+- `docs/product/brief.md`
+- `docs/architecture/api-conventions.md`
+- `docs/architecture/data-model-and-access-patterns.md`
+- `docs/architecture/system-context.md`
+- `docs/security/authorization-matrix.md`
+- `docs/security/threat-model.md`
+- `docs/ux/global-user-flows.md`
+- `docs/ux/interaction-states.md`
+- `docs/ux/responsive-accessibility.md`
+- `docs/testing/strategy.md`
+
+### Existing identity, domain, persistence, and request code
+
+- `shared/profilePalette.ts`
+- `lambdas/shared/auth.ts`
+- `lambdas/shared/request.ts`
+- `lambdas/shared/responses.ts`
+- `lambdas/shared/messages.ts`
+- `lambdas/households/constants.ts`
+- `lambdas/households/model.ts`
+- `lambdas/households/keys.ts`
+- `lambdas/households/familyValidation.ts`
+- `lambdas/households/authorization.ts`
+- `lambdas/households/repository.ts`
+- `lambdas/households/runtime.ts`
+- `lambdas/households/current.ts`
+- `lambdas/households/profile.ts`
+- `lambdas/households/directory.ts`
+- `lambdas/households/create.ts`
+
+### Existing tests that define the current boundary
+
+- `src/test/lambdas/authorization.test.ts`
+- `src/test/lambdas/credentialCutoff.test.ts`
+- `src/test/lambdas/familyValidation.test.ts`
+- `src/test/lambdas/householdValidation.test.ts`
+- `src/test/lambdas/directory.test.ts`
+- `src/test/integration/households.test.ts`
+
+Load `src/components/ProductionBootstrap.vue`, router files, CSS, and browser tests only if a proposed backend change unexpectedly affects a public payload or route. UI work is not expected in this slice.

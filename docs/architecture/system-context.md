@@ -14,7 +14,7 @@ This document defines system responsibilities and trust boundaries. Product beha
 | Child | Views and completes authorized Todos and manages only their own profile. |
 | Operator | Reviews plans, authorizes production changes, performs deployment, rollback, restore, and identity repair. |
 | Browser/PWA | Renders the application, authenticates with Cognito, and calls the API with a JWT. It is not trusted to enforce authorization. |
-| Amazon Cognito | Authenticates immutable, case-insensitive usernames and issues JWTs. Cognito `sub` is the stable identity. |
+| Amazon Cognito | Authenticates immutable, case-insensitive usernames, issues JWTs, retains verified parent recovery email, and sends low-volume transactional account email through its built-in sender. Cognito `sub` is the stable identity. |
 | CloudFront and S3 | Deliver versioned static PWA assets over HTTPS. |
 | API Gateway | Terminates the public API boundary and rejects invalid JWTs before protected handlers execute. |
 | Lambda | Validates requests, resolves membership, enforces role and household authorization, and performs application operations. |
@@ -57,6 +57,20 @@ flowchart LR
 The PWA is responsible for presentation, accessible interaction state, session initiation/restoration, and sending tokens only to the configured API origin. It may perform convenience validation, but server validation remains authoritative.
 
 API Gateway is responsible for JWT authentication on protected routes. Lambda is responsible for input validation, household and role authorization, lifecycle constraints, conflict detection, privacy-safe errors, and persistence.
+
+Cognito's built-in sender owns first-parent verification/recovery and additional-parent invitation
+delivery. The reviewed static invitation template is infrastructure configuration; Todone does not
+run an SES sender or custom-message Lambda. The deployment accepts Cognito's 50-message daily AWS
+account quota and requires a later reviewed architecture change before introducing SES.
+
+Privileged family-account handlers use the typed adapter in
+`lambdas/cognito/administration.ts`. It exposes only user creation/resend, pending-parent email
+update/verification, permanent child password replacement, user deletion, and global sign-out.
+Dependency failures become safe domain errors that retain no AWS message or metadata. These future
+handlers must explicitly use the separate family-account Lambda role; ordinary session,
+Membership, profile, and directory handlers retain a role with no Cognito administration access.
+The privileged role is restricted to those five Cognito IAM actions on the one Todone user-pool
+ARN.
 
 DynamoDB is the durable application store. Queries MUST follow the access patterns in `data-model-and-access-patterns.md`; table scans are not a normal request path. Point-in-time recovery is a recovery control, not an application history feature.
 

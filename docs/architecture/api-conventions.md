@@ -64,6 +64,15 @@ An active member receives exactly:
 }
 ```
 
+`{"membership": null}` means only that no user-membership lookup exists. It is not used for a
+pending, inactive, credential-cutoff-rejected, or inconsistent record. A pending or inactive
+identity receives `403 MEMBER_ACCESS_UNAVAILABLE`; a token without an `iat` later than the
+server-owned credential cutoff receives `401 SESSION_REAUTHENTICATION_REQUIRED`; malformed or
+inconsistent persistence receives a generic `500 INTERNAL_ERROR` with a request ID. These
+responses expose no household or target values. The client routes an unattached identity to
+household setup, a pending additional parent through activation, and inactive/stale access to a
+generic sign-in or unavailable surface rather than treating either as a new household owner.
+
 An unattached account creates its one household through:
 
 ```http
@@ -95,13 +104,46 @@ Authorization: Bearer <Cognito-ID-token>
 
 The caller's verified `sub` resolves the household; the request accepts no target or household identifier. The response contains only `memberId`, immutable `username`, immutable `role`, activation state, current `displayName`/canonical `color`, and stable `allowedActions`. It is deterministically ordered by activation state, username, then member ID. Active members have no directory actions. An active parent sees a pending parent with exactly `RESEND_WELCOME`, `CHANGE_EMAIL_AND_RESEND`, and `CANCEL_PENDING_ACCOUNT`; a child receives active members only. Inactive records, recovery email, Cognito status/details, raw `sub`, household details, and cross-household records are never represented.
 
+## Family-account management contracts
+
+Every endpoint in this section authenticates first and resolves the caller's active Membership
+before reading a target or invoking Cognito. The only exception is self activation, which resolves
+the verified caller's matching pending Membership under its narrower contract. Route `memberId`
+values identify targets only after the caller's household has been resolved; bodies never accept
+`householdId`, `memberId`, `sub`, role, activation state, username ownership, or credential cutoff.
+
+| Operation | Contract | Success | Retry and error rules |
+| --- | --- | --- | --- |
+| Create child | `POST /api/v1/family-members/children`; `Idempotency-Key`; body exactly `username`, `displayName`, `color`, `password` | `201` with the safe directory member; completed replay is `200` with the same member | Normalized global username conflict is `409 USERNAME_CONFLICT` with a username field error. A split Cognito/application result is generic `500` and requires operator cleanup before username retry. |
+| Create additional parent | `POST /api/v1/family-members/parents`; `Idempotency-Key`; body exactly `username`, `displayName`, `color`, `email` | `201` with the safe pending directory member; completed replay is `200` | Same conflict and split-result rules as child creation. Email is accepted for delivery but omitted from the returned member and peer reads. |
+| Activate additional parent | `POST /api/v1/parent-activations`; no body or target ID; caller has a new token after Cognito `NEW_PASSWORD_REQUIRED` | `200` with the ordinary active current-Membership representation | The adapter marks the already-configured Cognito email verified only after setup-code possession, then matching pending lookup and household Membership become active in one DynamoDB transaction. Repeating after success returns the same active representation. Unattached, child, inactive, mismatched, or corrupt records cannot activate. |
+| Reset child password | `PUT /api/v1/family-members/{memberId}/password`; body exactly `password` | `204` after permanent password replacement, global sign-out, and cutoff advancement | Password resets are not automatically replayed after an uncertain response and do not use an idempotency record containing or derived from the password. The UI requires a new explicit submission. Parent/pending/inactive targets are `403 TARGET_NOT_MANAGEABLE`; absent/cross-household targets are `404`. |
+| Resend pending-parent welcome | `POST /api/v1/family-members/{memberId}/welcome-email-resends`; `Idempotency-Key`; no body | `204`; a completed replay is also `204` | Only the same-household pending parent state is valid. Cognito resend throttling is `429`; an uncertain send reports a generic request-ID failure and the UI does not claim delivery. |
+| Change pending email and resend | `PUT /api/v1/family-members/{memberId}/pending-email`; `Idempotency-Key`; body exactly `email` | `204` after Cognito accepts the replacement and resend | The email and rendered message are never returned, logged, or stored in application records. Same target-state, throttling, and uncertain-send rules as resend. |
+| Cancel pending parent | `DELETE /api/v1/family-members/{memberId}/pending-account`; `Idempotency-Key`; body exactly `{"confirmation": true}` | `204`; completed replay is `204` | Only a pending parent is targetable. Active parents and children are `403`; absence/cross-household is `404`. A split deletion requires operator cleanup. |
+| Remove child | `DELETE /api/v1/family-members/{memberId}`; `Idempotency-Key`; body exactly `{"confirmation": true}` | `204` only after the complete deployed cascade and Cognito deletion | Missing/false confirmation is `422`. Parent or non-active-child targets are `403`; absence/cross-household is `404`. A partial cascade returns generic `500`, remains fail closed, and requires operator cleanup before username reuse. |
+| Read own recovery email | `GET /api/v1/security/recovery-email` | `200 {"email":"…"}` to the owning active parent only | Children receive `403`. The value is `no-store`, private, and absent from logs and peer APIs. |
+| Start own recovery-email replacement | `PUT /api/v1/security/recovery-email`; body exactly `email` | `202` after Cognito stages the new value and sends its verification code | Active-parent self only. The old verified value remains current. The browser completes Cognito `VerifyUserAttribute` with its access token; only then does Cognito promote the new value. The app client cannot directly write `email`, preventing a child from bypassing the parent-only API. |
+
+Creation and lifecycle idempotency records bind the key to caller `sub`, route template, target
+where present, and a one-way normalized-input digest that excludes passwords. They contain no
+email, username, display name, profile value, or raw body. An idempotency key reused with different
+non-secret input returns `409 IDEMPOTENCY_CONFLICT`. A request may replay only a confirmed complete
+result; it never guesses that an identity-only or data-only partial result succeeded.
+
+Known dependency unavailability before any external or persistence side effect may return `503`
+with safe retry guidance. Once an operation might have changed Cognito or DynamoDB but cannot prove
+the complete outcome, it returns generic `500 INTERNAL_ERROR` with the request ID. Todone provides
+no automatic repair state machine or household repair UI; an authorized operator inspects and
+cleans the orphan before the product retries the username or destructive transition.
+
 ## Authentication and authorization
 
 - Protected requests use `Authorization: Bearer <Cognito ID token>` over HTTPS. Tokens MUST NOT appear in URLs, logs, error text, analytics, or persistent application data.
 - API Gateway verifies configured issuer, audience, signature, and expiry before a protected handler runs.
 - Handlers use API Gateway's verified authorizer claims, including `sub`, as caller identity. They do not re-verify the raw bearer token. Username, display name, body fields, route household IDs, and query parameters never establish ownership.
 - Every household route resolves active Membership and applies the server-side authorization matrix in `docs/security/authorization-matrix.md`.
-- A token may be valid while Membership is absent or inactive. Such a request is denied.
+- A token may be cryptographically valid while Membership is absent, pending, inactive, inconsistent, or rejected by its credential cutoff. Only the specifically documented unattached bootstrap and pending-parent activation paths bypass the ordinary active-Membership requirement.
 - CORS permits only explicitly configured local origins and the production PWA origin. CORS is not treated as authentication.
 
 ## Representation conventions
@@ -145,6 +187,11 @@ Non-idempotent creates that may be retried require an `Idempotency-Key` header. 
 | `503 Service Unavailable` | Known temporary dependency unavailability where retry may succeed. |
 
 Authentication and cross-household responses MUST NOT reveal whether a username, household, member, Todo, label, or template exists, except where the approved product flow explicitly requires a same-household conflict such as label selection.
+
+Within a safely resolved household, a known target with a prohibited role/state returns `403`.
+An absent or cross-household target returns the same `404`. Persistence inconsistency is not
+reported as expected absence or authorization denial: it returns generic `500` externally and a
+coarse, non-identifying consistency outcome internally.
 
 ## Error contract
 

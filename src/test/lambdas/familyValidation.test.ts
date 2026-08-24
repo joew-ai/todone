@@ -54,9 +54,10 @@ describe('family-account validation contracts', () => {
     expect(validateProfileInput(input).kind).toBe('invalid');
   });
 
-  it('rejects a non-string display name as a malformed caller contract', () => {
-    expect(() => validateProfileInput({ displayName: 42, color: 'PINE', version: 0 })).toThrow(
-      'Profile display name must be a string.',
-    );
+  it('returns a stable field error for a non-string display name', () => {
+    expect(validateProfileInput({ displayName: 42, color: 'PINE', version: 0 })).toMatchObject({
+      kind: 'invalid',
+      fieldErrors: [{ field: 'displayName', code: 'INVALID_DISPLAY_NAME' }],
+    });
   });
 });

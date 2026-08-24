@@ -5,6 +5,8 @@ import { json, unauthorizedResponse } from '../shared/responses';
 import type { TokenVerifier } from '../session/verifier';
 import type { HouseholdRepository } from './model';
 import { getHouseholdRepository } from './runtime';
+import { membershipResolutionFailureResponse } from './authorization';
+import { MembershipResolutionKind } from './constants';
 
 const CURRENT_MEMBERSHIP_ROUTE = '/api/v1/memberships/current';
 
@@ -22,7 +24,11 @@ export async function handler(
     if (!identity) return unauthorizedResponse(requestId);
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
-    return json(200, { membership });
+    const resolution = await repository.resolveMembership(identity.sub, identity.issuedAt);
+    if (resolution.kind === MembershipResolutionKind.unattached)
+      return json(200, { membership: null });
+    if (resolution.kind === MembershipResolutionKind.active)
+      return json(200, { membership: resolution.membership });
+    return membershipResolutionFailureResponse(resolution, requestId);
   });
 }

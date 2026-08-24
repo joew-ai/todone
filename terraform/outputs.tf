@@ -96,6 +96,10 @@ output "runtime_role_arn" {
   value = aws_iam_role.lambda_role.arn
 }
 
+output "family_account_admin_role_arn" {
+  value = aws_iam_role.family_account_admin_role.arn
+}
+
 output "log_group_names" {
   value = concat(
     [for lambda in values(module.lambdas) : lambda.log_group_name],

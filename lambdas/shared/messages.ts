@@ -10,6 +10,21 @@ interface LambdaMessages {
     invalidVersion: string;
     conflict: string;
   };
+  membershipApi: {
+    accessUnavailable: string;
+    reauthenticationRequired: string;
+    internalError: string;
+  };
+  cognitoAdministration: {
+    usernameConflict: string;
+    identityConflict: string;
+    userNotFound: string;
+    invalidPassword: string;
+    invalidState: string;
+    throttled: string;
+    unavailable: string;
+    unknown: string;
+  };
 }
 
 // Local Lambda development runs from the repository root; deployed Lambda

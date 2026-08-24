@@ -42,7 +42,11 @@ Todone does not display a Todo, member, label, or lifecycle transition as succes
 
 Every versioned mutation sends the version last read. On conflict, the server's current safe state replaces stale state only after the client identifies the change to the user. Last-write-wins and silent form reset are prohibited.
 
-Idempotent retries reuse the original idempotency key. A retry with materially different input uses a new key. The UI never generates multiple keys for duplicate activation of one in-flight operation.
+Idempotent retries reuse the original idempotency key. A retry with materially different non-secret
+input uses a new key. The UI never generates multiple keys for duplicate activation of one
+in-flight operation. Password reset does not persist an idempotency value derived from the password
+and is not automatically replayed after an uncertain response; the user makes a new explicit
+submission. A Cognito/application split result is not presented as recoverable by ordinary retry.
 
 ## Focus after list changes
 
@@ -63,7 +67,11 @@ Credential errors do not identify whether username or password was correct. Setu
 - Child removal and Todo deletion require a modal confirmation with target name/title, irreversible consequence text, and explicit confirm/cancel labels.
 - Child password reset clearly identifies the child and never displays the submitted password after success.
 - Parent peers never receive reset/removal controls; a forged call still receives server denial.
-- A partial identity/application-data operation reports a generic failure and request ID. It does not invite repeated username reuse until operator repair completes.
+- A partial identity/application-data operation reports a generic failure and request ID. It does
+  not offer an ordinary retry or invite repeated username reuse until operator repair completes.
+- `membership: null` is shown only as first-parent household setup. Pending, inactive,
+  credential-stale, and inconsistent states use activation, sign-in, or generic unavailable/error
+  treatment and never imply that the user can create another household.
 - Sign-out is available to every signed-in user and clears private screen state immediately after local session termination.
 
 ## Motion and timing

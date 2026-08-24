@@ -11,6 +11,26 @@ export const MembershipActivationState = {
   inactive: 'INACTIVE',
 } as const;
 
+export const MembershipResolutionKind = {
+  unattached: 'unattached',
+  active: 'active',
+  pendingActivation: 'pending-activation',
+  inactive: 'inactive',
+  credentialsStale: 'credentials-stale',
+  inconsistent: 'inconsistent',
+} as const;
+
+export const MembershipField = {
+  householdId: 'householdId',
+  memberId: 'memberId',
+  sub: 'sub',
+  username: 'username',
+  role: 'role',
+  activationState: 'activationState',
+  credentialsValidAfter: 'credentialsValidAfter',
+  createdAt: 'createdAt',
+} as const;
+
 export const PendingParentAction = {
   resendWelcome: 'RESEND_WELCOME',
   changeEmailAndResend: 'CHANGE_EMAIL_AND_RESEND',
@@ -49,6 +69,9 @@ export const HouseholdErrorCode = {
   profileConflict: 'PROFILE_CONFLICT',
   membershipExists: 'MEMBERSHIP_EXISTS',
   idempotencyConflict: 'IDEMPOTENCY_CONFLICT',
+  memberAccessUnavailable: 'MEMBER_ACCESS_UNAVAILABLE',
+  sessionReauthenticationRequired: 'SESSION_REAUTHENTICATION_REQUIRED',
+  internalError: 'INTERNAL_ERROR',
 } as const;
 
 export const MAX_HOUSEHOLD_NAME_LENGTH = 80;

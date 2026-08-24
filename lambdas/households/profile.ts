@@ -10,7 +10,8 @@ import {
   validationFailedResponse,
 } from '../shared/responses';
 import type { TokenVerifier } from '../session/verifier';
-import { HouseholdErrorCode } from './constants';
+import { HouseholdErrorCode, MembershipResolutionKind } from './constants';
+import { membershipResolutionFailureResponse } from './authorization';
 import { validateProfileInput } from './familyValidation';
 import type { HouseholdRepository } from './model';
 import { getHouseholdRepository } from './runtime';
@@ -34,8 +35,10 @@ export async function readHandler(
     if (!identity) return unauthorizedResponse(requestId);
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
-    if (!membership) return unauthorizedResponse(requestId);
+    const resolution = await repository.resolveMembership(identity.sub, identity.issuedAt);
+    if (resolution.kind !== MembershipResolutionKind.active)
+      return membershipResolutionFailureResponse(resolution, requestId);
+    const { membership } = resolution;
     const profile = await repository.getProfile(
       membership.household.householdId,
       membership.memberId,
@@ -66,8 +69,10 @@ export async function updateHandler(
     }
 
     const repository = dependencies?.repository ?? getHouseholdRepository();
-    const membership = await repository.getCurrentMembership(identity.sub, identity.issuedAt);
-    if (!membership) return unauthorizedResponse(requestId);
+    const resolution = await repository.resolveMembership(identity.sub, identity.issuedAt);
+    if (resolution.kind !== MembershipResolutionKind.active)
+      return membershipResolutionFailureResponse(resolution, requestId);
+    const { membership } = resolution;
     const result = await repository.saveProfile({
       householdId: membership.household.householdId,
       memberId: membership.memberId,

@@ -19,8 +19,10 @@ export const HttpStatus = {
   created: 201,
   badRequest: 400,
   unauthorized: 401,
+  forbidden: 403,
   conflict: 409,
   unprocessableContent: 422,
+  internalServerError: 500,
 } as const;
 
 export function json(statusCode: number, value: unknown): APIGatewayProxyStructuredResultV2 {

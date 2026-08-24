@@ -16,6 +16,7 @@ import {
   INITIAL_HOUSEHOLD_VERSION,
   INITIAL_PROFILE_VERSION,
   MembershipActivationState,
+  MembershipResolutionKind,
   ProfileColor,
 } from './constants';
 import {
@@ -32,17 +33,17 @@ import type {
   BootstrapResult,
   CurrentMembership,
   FamilyDirectoryMember,
+  Household,
   HouseholdRepository,
+  Membership,
   MembershipActivationState as MembershipActivationStateValue,
+  MembershipLookup,
+  MembershipResolution,
   MembershipRole,
   Profile,
   SaveProfileInput,
   SaveProfileResult,
 } from './model';
-
-interface StoredMembership extends CurrentMembership {
-  sub: string;
-}
 
 export class DynamoHouseholdRepository implements HouseholdRepository {
   constructor(
@@ -52,24 +53,21 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
     private readonly id = randomUUID,
   ) {}
 
-  async getCurrentMembership(
-    sub: string,
-    tokenIssuedAt?: number,
-  ): Promise<CurrentMembership | null> {
-    const lookup = await this.getItem(membershipLookupKey(sub));
-    if (!lookup) return null;
-    if (requiredActivationState(lookup.activationState) !== MembershipActivationState.active) {
-      return null;
+  async resolveMembership(sub: string, tokenIssuedAt?: number): Promise<MembershipResolution> {
+    try {
+      const lookup = await this.getItem(membershipLookupKey(sub));
+      if (!lookup) return { kind: MembershipResolutionKind.unattached };
+      const householdId = requiredStringAttribute(lookup.householdId);
+      const memberId = requiredStringAttribute(lookup.memberId);
+      const [household, membership] = await Promise.all([
+        this.getItem(householdKey(householdId)),
+        this.getItem(householdMemberKey(householdId, memberId)),
+      ]);
+      if (!household || !membership) return { kind: MembershipResolutionKind.inconsistent };
+      return membershipResolutionFromStoredItems(lookup, membership, household, sub, tokenIssuedAt);
+    } catch {
+      return { kind: MembershipResolutionKind.inconsistent };
     }
-    if (!isTokenCurrent(lookup.credentialsValidAfter, tokenIssuedAt)) return null;
-    const householdId = requiredStringAttribute(lookup.householdId);
-    const memberId = requiredStringAttribute(lookup.memberId);
-    const [household, membership] = await Promise.all([
-      this.getItem(householdKey(householdId)),
-      this.getItem(householdMemberKey(householdId, memberId)),
-    ]);
-    if (!household || !membership) return null;
-    return membershipFromStoredItems(lookup, membership, household, sub);
   }
 
   async bootstrap(input: BootstrapInput): Promise<BootstrapResult> {
@@ -93,7 +91,7 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
           TransactItems: [
             putItem(
               this.tableName,
-              membershipLookupItem(input.sub, input.username, householdId, memberId),
+              membershipLookupItem(input.sub, input.username, householdId, memberId, createdAt),
               ATTRIBUTE_DOES_NOT_EXIST,
             ),
             putItem(this.tableName, householdItem(householdId, input, createdAt)),
@@ -114,9 +112,9 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
       if (!(error instanceof TransactionCanceledException)) throw error;
       const replayAfterConflict = await this.readReplay(input.sub, input.idempotencyKey, inputHash);
       if (replayAfterConflict) return replayAfterConflict;
-      return (await this.getCurrentMembership(input.sub))
-        ? { kind: 'already-member' }
-        : { kind: 'idempotency-conflict' };
+      return (await this.resolveMembership(input.sub)).kind === MembershipResolutionKind.unattached
+        ? { kind: 'idempotency-conflict' }
+        : { kind: 'already-member' };
     }
   }
 
@@ -207,20 +205,22 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
 }
 
 export class InMemoryHouseholdRepository implements HouseholdRepository {
-  private readonly memberships = new Map<string, StoredMembership>();
+  private readonly lookups = new Map<string, MembershipLookup>();
+  private readonly households = new Map<string, Household>();
+  private readonly memberships = new Map<string, Membership>();
   private readonly replays = new Map<string, { hash: string; membership: CurrentMembership }>();
   private readonly profiles = new Map<string, Profile>();
   constructor(private readonly id = randomUUID) {}
 
-  async getCurrentMembership(
-    sub: string,
-    _tokenIssuedAt?: number,
-  ): Promise<CurrentMembership | null> {
-    const stored = this.memberships.get(sub);
-    if (!stored) return null;
-    const { sub: ignoredSub, ...membership } = stored;
-    void ignoredSub;
-    return structuredClone(membership);
+  async resolveMembership(sub: string, tokenIssuedAt?: number): Promise<MembershipResolution> {
+    const lookup = this.lookups.get(sub);
+    if (!lookup) return { kind: MembershipResolutionKind.unattached };
+    const household = this.households.get(lookup.householdId);
+    const membership = this.memberships.get(
+      membershipStorageKey(lookup.householdId, lookup.memberId),
+    );
+    if (!household || !membership) return { kind: MembershipResolutionKind.inconsistent };
+    return resolveMembershipRecords(lookup, membership, household, sub, tokenIssuedAt);
   }
 
   async bootstrap(input: BootstrapInput): Promise<BootstrapResult> {
@@ -232,16 +232,42 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
         ? { kind: 'replayed', membership: structuredClone(replay.membership) }
         : { kind: 'idempotency-conflict' };
     }
-    if (this.memberships.has(input.sub)) return { kind: 'already-member' };
+    if (this.lookups.has(input.sub)) return { kind: 'already-member' };
 
+    const householdId = this.id();
+    const memberId = this.id();
+    const createdAt = new Date(0).toISOString();
     const membership = currentMembership({
-      memberId: this.id(),
-      householdId: this.id(),
+      memberId,
+      householdId,
       name: input.name,
       timezone: input.timezone,
       username: input.username,
     });
-    this.memberships.set(input.sub, { ...structuredClone(membership), sub: input.sub });
+    this.lookups.set(input.sub, {
+      householdId,
+      memberId,
+      username: input.username,
+      role: HouseholdRole.parent,
+      activationState: MembershipActivationState.active,
+      createdAt,
+    });
+    this.households.set(householdId, {
+      householdId,
+      name: input.name,
+      timezone: input.timezone,
+      createdAt,
+      version: INITIAL_HOUSEHOLD_VERSION,
+    });
+    this.memberships.set(membershipStorageKey(householdId, memberId), {
+      memberId,
+      householdId,
+      sub: input.sub,
+      username: input.username,
+      role: HouseholdRole.parent,
+      activationState: MembershipActivationState.active,
+      createdAt,
+    });
     this.replays.set(replayKey, { hash: inputHash, membership: structuredClone(membership) });
     return { kind: 'created', membership };
   }
@@ -268,13 +294,9 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
   }
 
   async listFamilyMembers(householdId: string): Promise<FamilyDirectoryMember[]> {
-    // Memberships are indexed by Cognito `sub` across every in-memory household.
     const members = [...this.memberships.values()]
-      .filter((membership) => membership.household.householdId === householdId)
-      .map(({ sub: ignoredSub, ...membership }) => {
-        void ignoredSub;
-        return membership;
-      });
+      .filter((membership) => membership.householdId === householdId)
+      .filter(isVisibleInMemoryDirectoryMembership);
     const directory = members.map((membership) => {
       const profile =
         this.profiles.get(profileStorageKey(householdId, membership.memberId)) ?? null;
@@ -283,7 +305,7 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
         memberId: membership.memberId,
         username: membership.username,
         role: membership.role,
-        activationState: MembershipActivationState.active,
+        activationState: membership.activationState,
         displayName: profile.displayName,
         color: profile.color,
       };
@@ -312,6 +334,7 @@ function membershipLookupItem(
   username: string,
   householdId: string,
   memberId: string,
+  createdAt: string,
 ) {
   const key = membershipLookupKey(sub);
   return {
@@ -322,6 +345,7 @@ function membershipLookupItem(
     username: stringAttribute(username),
     role: stringAttribute(HouseholdRole.parent),
     activationState: stringAttribute(MembershipActivationState.active),
+    createdAt: stringAttribute(createdAt),
   };
 }
 
@@ -390,33 +414,113 @@ function profileItem(householdId: string, profile: Profile) {
   };
 }
 
-function membershipFromStoredItems(
+function membershipResolutionFromStoredItems(
   lookup: Record<string, AttributeValue>,
   membership: Record<string, AttributeValue>,
   household: Record<string, AttributeValue>,
   sub: string,
-): CurrentMembership {
-  const memberId = requiredStringAttribute(lookup.memberId);
-  const username = requiredStringAttribute(lookup.username);
+  tokenIssuedAt?: number,
+): MembershipResolution {
+  const lookupRecord: MembershipLookup = {
+    householdId: requiredStringAttribute(lookup.householdId),
+    memberId: requiredStringAttribute(lookup.memberId),
+    username: requiredStringAttribute(lookup.username),
+    role: requiredMembershipRole(lookup.role),
+    activationState: requiredActivationState(lookup.activationState),
+    ...(lookup.credentialsValidAfter
+      ? { credentialsValidAfter: requiredStringAttribute(lookup.credentialsValidAfter) }
+      : {}),
+    ...(lookup.createdAt ? { createdAt: requiredStringAttribute(lookup.createdAt) } : {}),
+  };
+  const membershipRecord: AuthorizingMembershipRecord = {
+    memberId: requiredStringAttribute(membership.memberId),
+    sub: requiredStringAttribute(membership.sub),
+    username: requiredStringAttribute(membership.username),
+    role: requiredMembershipRole(membership.role),
+    activationState: requiredActivationState(membership.activationState),
+  };
+  const householdRecord: AuthorizingHouseholdRecord = {
+    householdId: requiredStringAttribute(household.householdId),
+    name: requiredStringAttribute(household.name),
+    timezone: requiredStringAttribute(household.timezone),
+  };
+  return resolveMembershipRecords(
+    lookupRecord,
+    membershipRecord,
+    householdRecord,
+    sub,
+    tokenIssuedAt,
+  );
+}
+
+type AuthorizingMembershipRecord = Pick<
+  Membership,
+  'memberId' | 'sub' | 'username' | 'role' | 'activationState'
+>;
+type AuthorizingHouseholdRecord = Pick<Household, 'householdId' | 'name' | 'timezone'>;
+
+/**
+ * Resolves only the persisted fields that establish caller identity and household authority.
+ * Creation-time metadata and optimistic-concurrency versions are validated by their owning writes,
+ * not repeatedly on an unrelated authorization read.
+ */
+export function resolveMembershipRecords(
+  lookup: MembershipLookup,
+  membership: AuthorizingMembershipRecord,
+  household: AuthorizingHouseholdRecord,
+  sub: string,
+  tokenIssuedAt?: number,
+): MembershipResolution {
+  if (!membershipAuthorityMatches(lookup, membership, household, sub)) {
+    return { kind: MembershipResolutionKind.inconsistent };
+  }
+  if (lookup.credentialsValidAfter && !isStoredTimestamp(lookup.credentialsValidAfter)) {
+    return { kind: MembershipResolutionKind.inconsistent };
+  }
+  if (lookup.activationState === MembershipActivationState.pendingActivation) {
+    if (lookup.role !== HouseholdRole.parent) {
+      return { kind: MembershipResolutionKind.inconsistent };
+    }
+    return { kind: MembershipResolutionKind.pendingActivation };
+  }
+  if (lookup.activationState === MembershipActivationState.inactive) {
+    return { kind: MembershipResolutionKind.inactive };
+  }
   if (
-    requiredStringAttribute(membership.memberId) !== memberId ||
-    requiredStringAttribute(membership.sub) !== sub ||
-    requiredStringAttribute(membership.username) !== username ||
-    requiredMembershipRole(membership.role) !== requiredMembershipRole(lookup.role) ||
-    requiredActivationState(membership.activationState) !== MembershipActivationState.active
+    lookup.credentialsValidAfter &&
+    !isTokenIssuedAfter(lookup.credentialsValidAfter, tokenIssuedAt)
   ) {
-    throw new Error('Stored membership lookup is inconsistent.');
+    return { kind: MembershipResolutionKind.credentialsStale };
   }
   return {
-    memberId,
-    username,
-    role: requiredMembershipRole(lookup.role),
-    household: {
-      householdId: requiredStringAttribute(lookup.householdId),
-      name: requiredStringAttribute(household.name),
-      timezone: requiredStringAttribute(household.timezone),
+    kind: MembershipResolutionKind.active,
+    membership: {
+      memberId: lookup.memberId,
+      username: lookup.username,
+      role: lookup.role,
+      household: {
+        householdId: lookup.householdId,
+        name: household.name,
+        timezone: household.timezone,
+      },
     },
   };
+}
+
+function membershipAuthorityMatches(
+  lookup: MembershipLookup,
+  membership: AuthorizingMembershipRecord,
+  household: AuthorizingHouseholdRecord,
+  sub: string,
+): boolean {
+  return (
+    household.householdId === lookup.householdId &&
+    membership.memberId === lookup.memberId &&
+    membership.sub === sub &&
+    membership.username === lookup.username &&
+    membership.role === lookup.role &&
+    membership.activationState === lookup.activationState
+  );
 }
 
 function membershipFromReplayItem(item: Record<string, AttributeValue>): CurrentMembership {
@@ -458,6 +562,14 @@ function isVisibleDirectoryMembership(item: Record<string, AttributeValue>): boo
   return (
     activationState === MembershipActivationState.pendingActivation &&
     requiredMembershipRole(item.role) === HouseholdRole.parent
+  );
+}
+
+function isVisibleInMemoryDirectoryMembership(membership: Membership): boolean {
+  if (membership.activationState === MembershipActivationState.active) return true;
+  return (
+    membership.activationState === MembershipActivationState.pendingActivation &&
+    membership.role === HouseholdRole.parent
   );
 }
 
@@ -542,6 +654,20 @@ export function isTokenCurrent(value: AttributeValue | undefined, issuedAt?: num
   const cutoff = Date.parse(requiredStringAttribute(value));
   if (Number.isNaN(cutoff)) throw new Error('Stored credential cutoff is invalid.');
   return issuedAt * 1000 > cutoff;
+}
+function isTokenIssuedAfter(cutoff: string, issuedAt?: number): boolean {
+  if (issuedAt === undefined || !Number.isSafeInteger(issuedAt) || issuedAt < 0) return false;
+  const cutoffMilliseconds = Date.parse(cutoff);
+  return !Number.isNaN(cutoffMilliseconds) && issuedAt * 1000 > cutoffMilliseconds;
+}
+function isStoredTimestamp(value: string): boolean {
+  return (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  );
+}
+function membershipStorageKey(householdId: string, memberId: string): string {
+  return `${householdId}\0${memberId}`;
 }
 function cloneProfile(profile: Profile | null): Profile | null {
   return profile ? structuredClone(profile) : null;

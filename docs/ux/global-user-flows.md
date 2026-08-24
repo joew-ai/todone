@@ -39,11 +39,20 @@ flowchart TD
 1. A parent opens Family Management and sees active members with display name, username, immutable role, profile color, and only permitted actions. Recovery emails are absent.
 2. To add a child, the parent chooses a globally unique username, display name, color, and password. Delivery is suppressed; the child can sign in immediately after complete provisioning.
 3. To add a parent, the existing parent supplies username, display name, color, and email. The new parent verifies email and chooses their own password before Membership becomes active.
+   After Cognito completes the setup-code challenge, the activation API uses only the new parent's
+   verified identity to activate the matching pending Membership; an existing parent cannot do it
+   for them.
 4. Any member can edit only their own display name and profile color.
 5. A parent may reset a child password after explicit target identification. The password is never persisted or repeated.
 6. A parent cannot reset, remove, demote, or edit another parent.
 7. Child removal requires confirmation describing the full deployed cascade. Success invalidates stale sessions, removes child-associated data, and releases the username only after the cascade completes. Cancellation changes nothing.
-8. A partial Cognito/application-data failure returns a generic recoverable result and moves to the operator repair runbook; the product does not expose repair UI.
+8. A partial Cognito/application-data failure returns a generic request-ID result that does not
+   claim retry is safe. The username or lifecycle operation remains blocked until manual operator
+   cleanup; the product exposes no repair UI, automated repair, or monitoring.
+9. An authenticated identity with no lookup is routed to household setup. Pending, inactive,
+   credential-stale, and inconsistent Membership states are not treated as unattached: pending
+   parents remain in activation, stale sessions return to sign-in, and unavailable/corrupt access
+   uses a generic safe surface.
 
 ## First Todo loop
 

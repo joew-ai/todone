@@ -6,6 +6,7 @@
 | --- | --- |
 | Anonymous | No valid Cognito JWT. |
 | Unattached account | Authenticated first-parent registrant with no Membership. |
+| Pending parent | Authenticated additional parent whose matching lookup and household Membership are both `PENDING_ACTIVATION`; has no household authority. |
 | Child | Authenticated user with an active immutable `child` Membership. |
 | Parent | Authenticated user with an active immutable `parent` Membership. All parents are peers. |
 | Scheduler | Non-user runtime path that generates/reconciles recurrence under a narrowly scoped service role. |
@@ -29,6 +30,15 @@ Authentication proves a Cognito `sub`. Each application request then resolves ac
 | Sign in / initiate parent Forgot Password | Allow | Allow | Allow sign-in only | Allow | Cognito rules; recovery requires that account's verified email; generic responses. |
 | Create household | Deny | Self once | Deny | Deny | No existing user lookup; atomically/idempotently creates Household and initial parent Membership. |
 | Read current household/membership | Deny | Returns no membership only | Own household | Own household | Derive by `sub`; never trust requested household ID. |
+
+A pending parent is denied every ordinary household operation in this matrix. After Cognito's
+`NEW_PASSWORD_REQUIRED` challenge succeeds, that principal may call only
+`POST /api/v1/parent-activations`. The endpoint derives the pending identity from verified `sub`,
+accepts no target, and atomically activates the matching lookup and household Membership. An
+unattached, child, inactive, mismatched, or corrupt identity cannot use this exception; repeating
+it as the now-active self returns the current active Membership. The adapter marks only the
+caller's already-configured Cognito email verified after challenge completion; neither activation
+nor its request accepts an email value.
 
 ## Profiles and family accounts
 
@@ -84,10 +94,13 @@ Authentication proves a Cognito `sub`. Each application request then resolves ac
 ## Enforcement rules
 
 1. API Gateway rejects an invalid JWT before protected handlers.
-2. Lambda derives `sub` only from verified claims and reads a lookup plus matching active Membership for every household route; pending, inactive, or inconsistent records deny access.
+2. Lambda derives `sub` only from verified claims and strongly reads the lookup, Household, and matching household Membership for every household route. Only `ACTIVE` authorizes household data; pending, inactive, credential-stale, or inconsistent records deny access.
 3. Data keys use the resolved household, not a client household field.
 4. The operation checks role, target membership, ownership, and lifecycle before persistence or Cognito administration.
 5. Cross-household or hidden resources return the same safe result as absence.
 6. Membership removal takes effect on the next API call even if a JWT remains valid.
 7. Every matrix row that permits one role and denies another has integration tests for allow, role denial, cross-household denial, inactive membership, and forged identifiers.
 8. New endpoints are blocked from release until this matrix and its tests are updated.
+9. `POST /api/v1/parent-activations` is a narrow self-state transition, not a general household route: it accepts no target identity and may resolve only the verified caller's matching pending parent records.
+10. `credentialsValidAfter` is read from the user-membership lookup. Missing/old token `iat` after a cutoff returns reauthentication denial before household data or target reads.
+11. Cognito administration is dependency-injected only after the applicable caller and target rule succeeds. Its dedicated Lambda role permits only `AdminCreateUser`, `AdminDeleteUser`, `AdminSetUserPassword`, `AdminUpdateUserAttributes`, and `AdminUserGlobalSignOut` on the Todone user pool; ordinary read/profile Lambda roles have no Cognito administration permission.

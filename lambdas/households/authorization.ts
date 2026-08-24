@@ -1,11 +1,65 @@
-import { HouseholdRole, MembershipActivationState } from './constants';
-import type { CurrentMembership, FamilyDirectoryMember, HouseholdRepository } from './model';
+import {
+  HouseholdErrorCode,
+  HouseholdRole,
+  MembershipActivationState,
+  MembershipResolutionKind,
+} from './constants';
+import { errorResponse, HttpStatus } from '../shared/responses';
+import { messages } from '../shared/messages';
+import type { APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import type {
+  CurrentMembership,
+  FamilyDirectoryMember,
+  HouseholdRepository,
+  MembershipResolution,
+} from './model';
 
-export async function requireMembership(
+export async function resolveMembership(
   repository: HouseholdRepository,
   sub: string,
-): Promise<CurrentMembership | null> {
-  return repository.getCurrentMembership(sub);
+  tokenIssuedAt?: number,
+): Promise<MembershipResolution> {
+  return repository.resolveMembership(sub, tokenIssuedAt);
+}
+
+export function activeMembershipFromResolution(
+  resolution: MembershipResolution,
+): CurrentMembership | null {
+  if (resolution.kind !== MembershipResolutionKind.active) return null;
+  return resolution.membership;
+}
+
+export function isActiveParentMembership(membership: CurrentMembership): boolean {
+  return membership.role === HouseholdRole.parent;
+}
+
+/** Maps non-active Membership outcomes without exposing state or stored identity values. */
+export function membershipResolutionFailureResponse(
+  resolution: Exclude<MembershipResolution, { kind: 'active' }>,
+  requestId: string,
+): APIGatewayProxyStructuredResultV2 {
+  if (resolution.kind === MembershipResolutionKind.credentialsStale) {
+    return errorResponse(
+      HttpStatus.unauthorized,
+      HouseholdErrorCode.sessionReauthenticationRequired,
+      messages.membershipApi.reauthenticationRequired,
+      requestId,
+    );
+  }
+  if (resolution.kind === MembershipResolutionKind.inconsistent) {
+    return errorResponse(
+      HttpStatus.internalServerError,
+      HouseholdErrorCode.internalError,
+      messages.membershipApi.internalError,
+      requestId,
+    );
+  }
+  return errorResponse(
+    HttpStatus.forbidden,
+    HouseholdErrorCode.memberAccessUnavailable,
+    messages.membershipApi.accessUnavailable,
+    requestId,
+  );
 }
 
 export function isResourceInHousehold(
@@ -21,8 +75,10 @@ export async function requireActiveParent(
   sub: string,
   tokenIssuedAt?: number,
 ): Promise<CurrentMembership | null> {
-  const membership = await repository.getCurrentMembership(sub, tokenIssuedAt);
-  if (!membership || membership.role !== HouseholdRole.parent) return null;
+  const membership = activeMembershipFromResolution(
+    await repository.resolveMembership(sub, tokenIssuedAt),
+  );
+  if (!membership || !isActiveParentMembership(membership)) return null;
   return membership;
 }
 
@@ -33,6 +89,7 @@ export function isManageableChild(
   targetHouseholdId: string,
 ): boolean {
   return (
+    isActiveParentMembership(caller) &&
     target.role === HouseholdRole.child &&
     target.activationState === MembershipActivationState.active &&
     isResourceInHousehold(caller, targetHouseholdId)

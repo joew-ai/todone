@@ -26,6 +26,7 @@ const REGION = 'us-east-1';
 interface TerraformOutputs {
   cognitoUserPoolId: string;
   pwaClientId: string;
+  registrationClientId: string;
   staticSiteUrl: string;
   staticDistributionId: string;
   staticBucketName: string;
@@ -51,6 +52,7 @@ function readTerraformOutputs(): TerraformOutputs {
   return {
     cognitoUserPoolId: get('cognito_user_pool_id'),
     pwaClientId: get('pwa_client_id'),
+    registrationClientId: get('registration_client_id'),
     staticSiteUrl: get('static_site_url'),
     staticDistributionId: get('static_distribution_id'),
     staticBucketName: get('static_bucket_name'),
@@ -65,6 +67,7 @@ function buildFrontend(outputs: TerraformOutputs): void {
       ...process.env,
       VITE_COGNITO_USER_POOL_ID: outputs.cognitoUserPoolId,
       VITE_COGNITO_CLIENT_ID: outputs.pwaClientId,
+      VITE_COGNITO_REGISTRATION_CLIENT_ID: outputs.registrationClientId,
       VITE_COGNITO_REGION: REGION,
       // Deliberately no VITE_COGNITO_LOCAL_ENDPOINT: production always uses
       // real Cognito SRP, never cognito-local's USER_PASSWORD_AUTH.

@@ -33,15 +33,19 @@ Provide a Todone-compatible pool with these externally observable properties:
 
 ### PWA app client
 
-Provide a dedicated Todone browser client:
+Provide two public Todone browser clients:
 
-- It is a public client and MUST NOT require or expose a client secret in browser assets.
-- It supports the reviewed username/password and session refresh behavior selected for the PWA.
-- It MUST set an explicit empty Cognito `WriteAttributes` list for Todone. An authenticated browser
-  client therefore cannot directly call `UpdateUserAttributes` to replace `email`; Todone's
-  parent-authorized server API owns that transition. This restriction does not replace initial
-  first-parent signup with email or browser-side verification, both of which require dedicated
-  regression evidence.
+- The existing PWA client remains public, keeps its client ID and reviewed username/password/SRP
+  and refresh behavior, and MUST NOT expose a client secret. It MUST use the non-empty immutable
+  `custom:browser_write_guard` allowlist. Cognito treats an empty `WriteAttributes` list as
+  omission/default permissions, so an empty list is forbidden. The guard is never populated and
+  prevents an authenticated browser from directly replacing `email`.
+- A separate public registration client must allow only `email` writes and expose no normal
+  password/SRP/refresh authentication flow. It is used only for `SignUp`, `ConfirmSignUp`, and
+  resend-confirmation; it is never used for sessions, API authorization, or recovery-email
+  replacement. `ALLOW_CUSTOM_AUTH` is acceptable only while Todone has no custom-auth triggers.
+- Todone's parent-authorized server API owns recovery-email replacement. The PWA client must still
+  support `VerifyUserAttribute` after the server stages that authorized change.
 - Callback, logout, and allowed-origin configuration is limited to explicit local development origins and the production Todone origin.
 - Token validity and revocation settings are documented for Todone session handling.
 
@@ -118,7 +122,7 @@ Expose machine-readable outputs, using names consistent with `family-paas` conve
 | Cognito pool identity | User pool ID and ARN. |
 | JWT verification | Exact issuer URL and app-client audience/client ID. |
 | Cognito location | AWS region and any endpoint/domain needed by the selected browser flow. |
-| PWA client | Public app-client ID and non-secret session configuration needed by Todone. |
+| PWA and registration clients | Separate public client IDs; PWA session configuration; no client secret. |
 | API | Base URL and protected-authorizer identity. |
 | Static site | Canonical production URL and non-secret distribution/deployment target identity. |
 | DynamoDB | Dedicated table name and ARN, PITR status inspectability, and index names. |

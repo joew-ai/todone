@@ -1,6 +1,7 @@
 export interface AuthConfig {
   userPoolId: string;
   clientId: string;
+  registrationClientId: string;
   region: string;
   /**
    * LOCAL DEVELOPMENT ONLY. Set by scripts/setup-local-cognito.ts. When
@@ -18,11 +19,13 @@ export interface AuthConfig {
 export function loadAuthConfig(env: ImportMetaEnv = import.meta.env): AuthConfig {
   const userPoolId = env.VITE_COGNITO_USER_POOL_ID;
   const clientId = env.VITE_COGNITO_CLIENT_ID;
+  const registrationClientId = env.VITE_COGNITO_REGISTRATION_CLIENT_ID;
   const region = env.VITE_COGNITO_REGION;
 
   const missing = [
     !userPoolId && 'VITE_COGNITO_USER_POOL_ID',
     !clientId && 'VITE_COGNITO_CLIENT_ID',
+    !registrationClientId && 'VITE_COGNITO_REGISTRATION_CLIENT_ID',
     !region && 'VITE_COGNITO_REGION',
   ].filter((name): name is string => Boolean(name));
 
@@ -35,6 +38,7 @@ export function loadAuthConfig(env: ImportMetaEnv = import.meta.env): AuthConfig
   return {
     userPoolId,
     clientId,
+    registrationClientId,
     region,
     localEndpoint: env.VITE_COGNITO_LOCAL_ENDPOINT || undefined,
   };

@@ -6,15 +6,21 @@ describe('loadAuthConfig', () => {
     const config = loadAuthConfig({
       VITE_COGNITO_USER_POOL_ID: 'pool-id',
       VITE_COGNITO_CLIENT_ID: 'client-id',
+      VITE_COGNITO_REGISTRATION_CLIENT_ID: 'registration-client-id',
       VITE_COGNITO_REGION: 'us-east-1',
     } as ImportMetaEnv);
 
-    expect(config).toEqual({ userPoolId: 'pool-id', clientId: 'client-id', region: 'us-east-1' });
+    expect(config).toEqual({
+      userPoolId: 'pool-id',
+      clientId: 'client-id',
+      registrationClientId: 'registration-client-id',
+      region: 'us-east-1',
+    });
   });
 
   it('throws listing every missing variable', () => {
     expect(() => loadAuthConfig({} as unknown as ImportMetaEnv)).toThrow(
-      /VITE_COGNITO_USER_POOL_ID.*VITE_COGNITO_CLIENT_ID.*VITE_COGNITO_REGION/s,
+      /VITE_COGNITO_USER_POOL_ID.*VITE_COGNITO_CLIENT_ID.*VITE_COGNITO_REGISTRATION_CLIENT_ID.*VITE_COGNITO_REGION/s,
     );
   });
 
@@ -23,6 +29,7 @@ describe('loadAuthConfig', () => {
       loadAuthConfig({
         VITE_COGNITO_USER_POOL_ID: 'pool-id',
         VITE_COGNITO_CLIENT_ID: 'client-id',
+        VITE_COGNITO_REGISTRATION_CLIENT_ID: 'registration-client-id',
         VITE_COGNITO_REGION: '',
       } as ImportMetaEnv),
     ).toThrow(/VITE_COGNITO_REGION/);

@@ -11,6 +11,7 @@ const resendConfirmationCodeMock = vi.fn();
 const forgotPasswordMock = vi.fn();
 const confirmPasswordMock = vi.fn();
 const poolConfigs: unknown[] = [];
+const cognitoUserConfigs: unknown[] = [];
 
 vi.mock('amazon-cognito-identity-js', () => {
   class CognitoUserPool {
@@ -31,7 +32,9 @@ vi.mock('amazon-cognito-identity-js', () => {
     constructor(public data: unknown) {}
   }
   class CognitoUser {
-    constructor(public data: unknown) {}
+    constructor(public data: unknown) {
+      cognitoUserConfigs.push(data);
+    }
     authenticateUser(details: unknown, callbacks: unknown) {
       authenticateUserMock(details, callbacks);
     }
@@ -98,13 +101,19 @@ function buildSession(
 }
 
 function buildClient() {
-  return new AuthClient({ userPoolId: 'pool-id', clientId: 'client-id', region: 'us-east-1' });
+  return new AuthClient({
+    userPoolId: 'pool-id',
+    clientId: 'client-id',
+    registrationClientId: 'registration-client-id',
+    region: 'us-east-1',
+  });
 }
 
 function buildLocalClient() {
   return new AuthClient({
     userPoolId: 'local_abc123',
     clientId: 'local-client-id',
+    registrationClientId: 'local-registration-client-id',
     region: 'local',
     localEndpoint: 'http://localhost:9229',
   });
@@ -126,13 +135,17 @@ describe('AuthClient', () => {
     confirmPasswordMock.mockReset();
     sendMock.mockReset();
     poolConfigs.length = 0;
+    cognitoUserConfigs.length = 0;
   });
 
   it('configures Cognito to persist sessions in sessionStorage, never localStorage', () => {
     buildClient();
 
-    expect(poolConfigs).toHaveLength(1);
+    expect(poolConfigs).toHaveLength(2);
     expect(poolConfigs[0]).toEqual(expect.objectContaining({ Storage: sessionStorage }));
+    expect(poolConfigs[1]).toEqual(
+      expect.objectContaining({ ClientId: 'registration-client-id', Storage: sessionStorage }),
+    );
     expect(localStorage).toHaveLength(0);
   });
 
@@ -174,6 +187,7 @@ describe('AuthClient', () => {
       ],
       expect.any(Function),
     );
+    expect(poolConfigs[1]).toEqual(expect.objectContaining({ ClientId: 'registration-client-id' }));
   });
 
   it('normalizes a valid public-registration username before Cognito receives it', async () => {
@@ -253,6 +267,13 @@ describe('AuthClient', () => {
     );
     const result = await buildClient().confirmRegistration('parent', '123456');
     expect(result).toMatchObject({ kind: 'error', field: 'code', recoverable: true });
+    expect(cognitoUserConfigs.at(-1)).toEqual(
+      expect.objectContaining({
+        Pool: expect.objectContaining({
+          config: expect.objectContaining({ ClientId: 'registration-client-id' }),
+        }),
+      }),
+    );
   });
 
   it('resends confirmation codes', async () => {
@@ -260,6 +281,13 @@ describe('AuthClient', () => {
     await expect(buildClient().resendConfirmationCode('parent')).resolves.toEqual({
       kind: 'success',
     });
+    expect(cognitoUserConfigs.at(-1)).toEqual(
+      expect.objectContaining({
+        Pool: expect.objectContaining({
+          config: expect.objectContaining({ ClientId: 'registration-client-id' }),
+        }),
+      }),
+    );
   });
 
   it('keeps Forgot Password initiation generic for an unknown username', async () => {
@@ -410,6 +438,7 @@ describe('AuthClient (LOCAL DEVELOPMENT ONLY, localEndpoint set)', () => {
     confirmPasswordMock.mockReset();
     sendMock.mockReset();
     poolConfigs.length = 0;
+    cognitoUserConfigs.length = 0;
   });
 
   it('uses USER_PASSWORD_AUTH instead of SRP, and never calls authenticateUser', async () => {

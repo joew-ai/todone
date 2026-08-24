@@ -5,7 +5,12 @@ const fetchCurrentMembership = vi.fn();
 const fetchMyProfile = vi.fn();
 
 vi.mock('../../config/authConfig', () => ({
-  loadAuthConfig: () => ({ userPoolId: 'pool', clientId: 'client', region: 'us-east-1' }),
+  loadAuthConfig: () => ({
+    userPoolId: 'pool',
+    clientId: 'client',
+    registrationClientId: 'registration-client',
+    region: 'us-east-1',
+  }),
 }));
 vi.mock('../../services/authClient', () => ({
   AuthClient: class {

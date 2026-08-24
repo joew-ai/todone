@@ -51,7 +51,8 @@ export type AuthActionResult =
  */
 export class AuthClient {
   private readonly config: AuthConfig;
-  private readonly pool: CognitoUserPool;
+  private readonly authenticatedPool: CognitoUserPool;
+  private readonly registrationPool: CognitoUserPool;
   private readonly storage: Storage;
   private currentUser: CognitoUser | null = null;
   private localSession: AuthSession | null = null;
@@ -59,9 +60,14 @@ export class AuthClient {
   constructor(config: AuthConfig) {
     this.config = config;
     this.storage = sessionStorage;
-    this.pool = new CognitoUserPool({
+    this.authenticatedPool = new CognitoUserPool({
       UserPoolId: config.userPoolId,
       ClientId: config.clientId,
+      Storage: this.storage,
+    });
+    this.registrationPool = new CognitoUserPool({
+      UserPoolId: config.userPoolId,
+      ClientId: config.registrationClientId,
       Storage: this.storage,
     });
   }
@@ -92,7 +98,7 @@ export class AuthClient {
       return this.registerLocal(canonicalUsername, password, email, registrationGatePassword);
     }
     return new Promise((resolve) => {
-      this.pool.signUp(
+      this.registrationPool.signUp(
         canonicalUsername,
         password,
         [new CognitoUserAttribute({ Name: 'email', Value: email })],
@@ -112,7 +118,7 @@ export class AuthClient {
       return this.confirmRegistrationLocal(username, code);
     }
     return new Promise((resolve) => {
-      this.user(username).confirmRegistration(code, true, (error) =>
+      this.registrationUser(username).confirmRegistration(code, true, (error) =>
         resolve(error ? confirmationError(error) : { kind: 'success' }),
       );
     });
@@ -123,7 +129,7 @@ export class AuthClient {
       return this.resendConfirmationCodeLocal(username);
     }
     return new Promise((resolve) => {
-      this.user(username).resendConfirmationCode((error) =>
+      this.registrationUser(username).resendConfirmationCode((error) =>
         resolve(error ? confirmationError(error) : { kind: 'success' }),
       );
     });
@@ -168,7 +174,7 @@ export class AuthClient {
   signOut(): void {
     try {
       if (!this.config.localEndpoint) {
-        (this.currentUser ?? this.pool.getCurrentUser())?.signOut();
+        (this.currentUser ?? this.authenticatedPool.getCurrentUser())?.signOut();
       }
     } finally {
       // Sign-out is a local privacy boundary. Cognito SDK errors must not
@@ -185,7 +191,7 @@ export class AuthClient {
       return this.restoreLocalSession();
     }
 
-    const user = this.pool.getCurrentUser();
+    const user = this.authenticatedPool.getCurrentUser();
     if (!user) {
       this.clearStoredSession();
       return null;
@@ -222,7 +228,7 @@ export class AuthClient {
   }
 
   private async signInSrp(username: string, password: string): Promise<SignInResult> {
-    const user = new CognitoUser({ Username: username, Pool: this.pool });
+    const user = new CognitoUser({ Username: username, Pool: this.authenticatedPool });
     const authDetails = new AuthenticationDetails({ Username: username, Password: password });
 
     return new Promise<SignInResult>((resolve) => {
@@ -239,7 +245,11 @@ export class AuthClient {
   }
 
   private user(username: string): CognitoUser {
-    return new CognitoUser({ Username: username, Pool: this.pool });
+    return new CognitoUser({ Username: username, Pool: this.authenticatedPool });
+  }
+
+  private registrationUser(username: string): CognitoUser {
+    return new CognitoUser({ Username: username, Pool: this.registrationPool });
   }
 
   private async registerLocal(
@@ -253,7 +263,7 @@ export class AuthClient {
     try {
       await client.send(
         new SignUpCommand({
-          ClientId: this.config.clientId,
+          ClientId: this.config.registrationClientId,
           Username: username,
           Password: password,
           UserAttributes: [{ Name: 'email', Value: email }],
@@ -313,7 +323,7 @@ export class AuthClient {
     try {
       await client.send(
         new ConfirmSignUpCommand({
-          ClientId: this.config.clientId,
+          ClientId: this.config.registrationClientId,
           Username: username,
           ConfirmationCode: code,
         }),
@@ -330,7 +340,10 @@ export class AuthClient {
     const client = await this.localCognitoClient();
     try {
       await client.send(
-        new ResendConfirmationCodeCommand({ ClientId: this.config.clientId, Username: username }),
+        new ResendConfirmationCodeCommand({
+          ClientId: this.config.registrationClientId,
+          Username: username,
+        }),
       );
       return { kind: 'success' };
     } catch (error) {

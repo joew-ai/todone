@@ -26,7 +26,7 @@ locals {
 }
 
 # Every family-paas module below is pinned to this reviewed commit
-# (?ref=eeac7ad). Do not float to main; bump the ref deliberately in every
+# (?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31). Do not float to main; bump the ref deliberately in every
 # module block below after re-reviewing the new commit.
 
 data "terraform_remote_state" "shared" {
@@ -42,6 +42,15 @@ resource "aws_cognito_user_pool" "todone" {
   name                     = "${local.app_name}-users-${local.environment}"
   auto_verified_attributes = ["email"]
   deletion_protection      = "ACTIVE"
+
+  lifecycle {
+    # Cognito schemas are immutable after creation. The provider may otherwise
+    # attempt to reconcile computed schema defaults by removing/recreating a
+    # schema block, which Cognito rejects. The reviewed email and
+    # browser_write_guard definitions already exist; all non-schema pool
+    # settings remain Terraform-managed.
+    ignore_changes = [schema]
+  }
 
   username_configuration {
     case_sensitive = false
@@ -62,6 +71,21 @@ resource "aws_cognito_user_pool" "todone" {
     mutable             = true
   }
 
+  # This intentionally-unused immutable attribute gives the authenticated PWA
+  # client a non-empty, non-email write allowlist. Cognito treats an empty
+  # allowlist as omission/default permissions. Pool schemas are irreversible.
+  schema {
+    name                = "browser_write_guard"
+    attribute_data_type = "String"
+    mutable             = false
+    required            = false
+
+    string_attribute_constraints {
+      min_length = 1
+      max_length = 1
+    }
+  }
+
   admin_create_user_config {
     allow_admin_create_user_only = false
 
@@ -79,6 +103,11 @@ resource "aws_cognito_user_pool" "todone" {
           </body>
         </html>
       HTML
+      # The provider includes this field in UpdateUserPool even when email is
+      # the only requested delivery medium. Cognito rejects an empty SMS
+      # template, so keep this valid but dormant; administration.ts requests
+      # EMAIL explicitly and Todone configures no SMS delivery path.
+      sms_message = "Todone: {username}; one-time setup code: {####}. ${local.canonical_pwa_origin}/activate-parent"
     }
   }
 
@@ -113,15 +142,29 @@ resource "aws_cognito_user_pool" "todone" {
 }
 
 module "auth" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/cognito-app-client?ref=eeac7ad"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/cognito-app-client?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
 
-  app_name     = local.app_name
-  environment  = local.environment
-  user_pool_id = aws_cognito_user_pool.todone.id
+  app_name         = local.app_name
+  environment      = local.environment
+  user_pool_id     = aws_cognito_user_pool.todone.id
+  write_attributes = ["custom:browser_write_guard"]
+}
+
+# Public, registration-only client. Its only configured authentication flow is
+# unusable without custom-auth triggers; do not use it for sessions or APIs.
+module "registration_auth" {
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/cognito-app-client?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
+
+  app_name            = local.app_name
+  environment         = local.environment
+  user_pool_id        = aws_cognito_user_pool.todone.id
+  client_name         = "todone-registration-prod"
+  explicit_auth_flows = ["ALLOW_CUSTOM_AUTH"]
+  write_attributes    = ["email"]
 }
 
 module "table" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/dynamodb-table?ref=eeac7ad"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/dynamodb-table?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
 
   table_name  = "${local.app_name}-data-${local.environment}"
   environment = local.environment
@@ -234,7 +277,7 @@ resource "aws_iam_role_policy_attachment" "pre_signup_basic" {
 }
 
 module "pre_signup_lambda" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=eeac7ad"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
 
   function_name    = "pre-signup"
   app_name         = local.app_name
@@ -275,7 +318,7 @@ resource "aws_iam_role_policy" "lambda_table_access" {
 }
 
 module "lambdas" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=eeac7ad"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
 
   for_each = {
     session            = var.lambda_artifacts["session"]
@@ -301,7 +344,7 @@ module "lambdas" {
 }
 
 module "api" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/api-gateway?ref=eeac7ad"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/api-gateway?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
 
   app_name    = local.app_name
   environment = local.environment
@@ -356,7 +399,7 @@ module "api" {
 }
 
 module "frontend" {
-  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/frontend-hosting?ref=eeac7ad"
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/frontend-hosting?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
 
   app_name             = local.app_name
   environment          = local.environment

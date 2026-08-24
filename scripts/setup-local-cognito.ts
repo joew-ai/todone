@@ -24,11 +24,13 @@ import {
   ListUserPoolClientsCommand,
   ListUserPoolsCommand,
   UpdateUserPoolCommand,
+  type CreateUserPoolClientCommandInput,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 const LOCAL_ENDPOINT = process.env.COGNITO_LOCAL_ENDPOINT ?? 'http://localhost:9229';
 const POOL_NAME = 'todone-local';
-const CLIENT_NAME = 'todone-local-pwa';
+const PWA_CLIENT_NAME = 'todone-local-pwa';
+const REGISTRATION_CLIENT_NAME = 'todone-local-registration';
 const DEFAULT_USERNAME = 'localdev';
 // Local-only, throwaway credential. Never used against real infrastructure,
 // never a production secret.
@@ -46,14 +48,24 @@ async function main(): Promise<void> {
 
   const userPoolId = await getOrCreateUserPool(client);
   await enableLocalEmailVerification(client, userPoolId);
-  const clientId = await getOrCreateAppClient(client, userPoolId);
+  const clientId = await getOrCreateAppClient(client, userPoolId, PWA_CLIENT_NAME, [
+    'ALLOW_USER_PASSWORD_AUTH',
+    'ALLOW_REFRESH_TOKEN_AUTH',
+  ]);
+  const registrationClientId = await getOrCreateAppClient(
+    client,
+    userPoolId,
+    REGISTRATION_CLIENT_NAME,
+    ['ALLOW_CUSTOM_AUTH'],
+  );
   await upsertVerificationAccount(client, userPoolId, username, password);
-  writeLocalEnv({ userPoolId, clientId });
+  writeLocalEnv({ userPoolId, clientId, registrationClientId });
 
   console.log('Local Cognito is ready.');
   console.log(`  Endpoint: ${LOCAL_ENDPOINT}`);
   console.log(`  Pool:     ${userPoolId}`);
-  console.log(`  Client:   ${clientId}`);
+  console.log(`  PWA client:          ${clientId}`);
+  console.log(`  Registration client: ${registrationClientId}`);
   console.log(`  Username: ${username}`);
   console.log(
     password === DEFAULT_PASSWORD
@@ -115,11 +127,13 @@ async function enableLocalEmailVerification(
 async function getOrCreateAppClient(
   client: CognitoIdentityProviderClient,
   userPoolId: string,
+  clientName: string,
+  explicitAuthFlows: NonNullable<CreateUserPoolClientCommandInput['ExplicitAuthFlows']>,
 ): Promise<string> {
   const existing = await client.send(
     new ListUserPoolClientsCommand({ UserPoolId: userPoolId, MaxResults: 60 }),
   );
-  const found = existing.UserPoolClients?.find((c) => c.ClientName === CLIENT_NAME);
+  const found = existing.UserPoolClients?.find((c) => c.ClientName === clientName);
   if (found?.ClientId) {
     return found.ClientId;
   }
@@ -127,10 +141,10 @@ async function getOrCreateAppClient(
   const created = await client.send(
     new CreateUserPoolClientCommand({
       UserPoolId: userPoolId,
-      ClientName: CLIENT_NAME,
+      ClientName: clientName,
       // Public client: no secret, matching the real PWA app client.
       GenerateSecret: false,
-      ExplicitAuthFlows: ['ALLOW_USER_PASSWORD_AUTH', 'ALLOW_REFRESH_TOKEN_AUTH'],
+      ExplicitAuthFlows: explicitAuthFlows,
     }),
   );
 
@@ -180,7 +194,11 @@ function isUsernameExists(error: unknown): boolean {
   );
 }
 
-function writeLocalEnv(values: { userPoolId: string; clientId: string }): void {
+function writeLocalEnv(values: {
+  userPoolId: string;
+  clientId: string;
+  registrationClientId: string;
+}): void {
   const lines = existsSync(ENV_LOCAL_PATH)
     ? readFileSync(ENV_LOCAL_PATH, 'utf-8').split('\n').filter(Boolean)
     : [];
@@ -188,6 +206,7 @@ function writeLocalEnv(values: { userPoolId: string; clientId: string }): void {
   const updates: Record<string, string> = {
     VITE_COGNITO_USER_POOL_ID: values.userPoolId,
     VITE_COGNITO_CLIENT_ID: values.clientId,
+    VITE_COGNITO_REGISTRATION_CLIENT_ID: values.registrationClientId,
     VITE_COGNITO_REGION: 'local',
     VITE_COGNITO_LOCAL_ENDPOINT: LOCAL_ENDPOINT,
     COGNITO_USER_POOL_ID: values.userPoolId,

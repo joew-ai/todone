@@ -47,7 +47,7 @@ npm run dev:cognito
 npm run setup:local-cognito
 ```
 
-The setup script creates or reuses a local username-based user pool and public app client, creates a local-only verification account, and writes non-secret local endpoint/pool/client values to ignored `.env.local`. The default account is `localdev` with password `LocalDevPass123!`; this is a disposable local-only credential and MUST NOT be used for a real Cognito pool.
+The setup script creates or reuses a local username-based user pool, a normal PWA client, and a registration-only client; it creates a local-only verification account and writes non-secret endpoint/pool/client values to ignored `.env.local`. The default account is `localdev` with password `LocalDevPass123!`; this is a disposable local-only credential and MUST NOT be used for a real Cognito pool.
 
 Then start the app and local API in a separate terminal:
 
@@ -58,6 +58,8 @@ npm run dev:full
 Open `http://localhost:3001`, enter the local development account, and confirm the production sign-in flow reaches household creation or the existing household landing. `npm run dev:full` serves the frontend on port 3001, moves its paired local API to port 3002, and proxies `/api` requests to that process. It also proxies browser-only local Cognito traffic through `/cognito`, avoiding the emulator's missing CORS headers while the local API continues to reach Cognito directly on port 9229. `cognito-local` supports `USER_PASSWORD_AUTH`, not SRP, so `AuthClient` uses that flow only when `VITE_COGNITO_LOCAL_ENDPOINT` is explicitly present. The ordinary deployed configuration continues to use Cognito SRP. Local JWT verification fetches the local emulator JWKS and caches it; production verification continues to validate the real Cognito issuer, audience, token use, and JWKS.
 
 `cognito-local` does not execute Todone's deployed pre-signup Lambda. Its browser registration path therefore cannot prove Entry Code enforcement and MUST NOT be treated as that security test; the pure pre-signup unit tests and an explicitly authorized production smoke own that evidence. The emulator does write confirmation and recovery codes to its console once local pool setup enables email verification. Local confirmation, resend, and recovery flows use the emulator's raw Cognito API endpoint rather than the browser SDK's production endpoint.
+
+`cognito-local` also does not provide evidence that AWS Cognito persists or enforces the production app-client `WriteAttributes` restrictions. The local two-client arrangement exercises correct application routing only; the reviewed AWS disposable probe and the pre-apply Terraform plan own enforcement evidence for the immutable browser-write guard and registration-only client.
 
 To reset local identities, stop the emulator, delete `.cognito/db/`, delete `.env.local`, and repeat the bootstrap steps. This deletes synthetic local data only.
 

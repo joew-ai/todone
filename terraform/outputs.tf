@@ -18,6 +18,10 @@ output "pwa_client_id" {
   value = module.auth.client_id
 }
 
+output "registration_client_id" {
+  value = module.registration_auth.client_id
+}
+
 output "pwa_session_config" {
   value = module.auth.session_config
 }

@@ -154,6 +154,12 @@
         .task { padding-left: 2rem; padding-right: 2rem; }
         .comparison { grid-template-columns: 1fr 1fr; }
       }
+      @media (max-width: 759px) {
+        .demo { margin: 0 0 2rem; padding: 0; }
+        .app { border: 0; border-radius: 0; box-shadow: none; }
+        .comparison { gap: 0; }
+        .comparison .app { border-top: 1px solid var(--border); }
+      }
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
       }

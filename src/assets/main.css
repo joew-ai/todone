@@ -26,49 +26,57 @@
   --td-profile-on-color: 255 252 246;
 }
 
-:root[data-profile-color='PINE'] {
+:root[data-profile-color='PINE'],
+.profile-color-preview[data-profile-color='PINE'] {
   --td-profile-light: 227 239 231;
   --td-profile-mid: 188 214 196;
   --td-profile-deep: 32 84 60;
   --td-profile-muted: 99 138 113;
 }
-:root[data-profile-color='FERN'] {
+:root[data-profile-color='FERN'],
+.profile-color-preview[data-profile-color='FERN'] {
   --td-profile-light: 237 242 226;
   --td-profile-mid: 207 220 179;
   --td-profile-deep: 63 100 47;
   --td-profile-muted: 112 139 91;
 }
-:root[data-profile-color='MOSS'] {
+:root[data-profile-color='MOSS'],
+.profile-color-preview[data-profile-color='MOSS'] {
   --td-profile-light: 239 241 221;
   --td-profile-mid: 213 217 169;
   --td-profile-deep: 89 105 47;
   --td-profile-muted: 126 137 84;
 }
-:root[data-profile-color='CLAY'] {
+:root[data-profile-color='CLAY'],
+.profile-color-preview[data-profile-color='CLAY'] {
   --td-profile-light: 249 232 224;
   --td-profile-mid: 235 193 177;
   --td-profile-deep: 147 71 47;
   --td-profile-muted: 181 112 91;
 }
-:root[data-profile-color='CEDAR'] {
+:root[data-profile-color='CEDAR'],
+.profile-color-preview[data-profile-color='CEDAR'] {
   --td-profile-light: 243 231 223;
   --td-profile-mid: 222 193 177;
   --td-profile-deep: 115 72 53;
   --td-profile-muted: 153 111 91;
 }
-:root[data-profile-color='MARIGOLD'] {
+:root[data-profile-color='MARIGOLD'],
+.profile-color-preview[data-profile-color='MARIGOLD'] {
   --td-profile-light: 248 237 209;
   --td-profile-mid: 235 209 145;
   --td-profile-deep: 125 82 0;
   --td-profile-muted: 164 126 47;
 }
-:root[data-profile-color='LAKE'] {
+:root[data-profile-color='LAKE'],
+.profile-color-preview[data-profile-color='LAKE'] {
   --td-profile-light: 226 239 241;
   --td-profile-mid: 184 213 218;
   --td-profile-deep: 36 94 109;
   --td-profile-muted: 91 142 153;
 }
-:root[data-profile-color='DUSK'] {
+:root[data-profile-color='DUSK'],
+.profile-color-preview[data-profile-color='DUSK'] {
   --td-profile-light: 238 229 240;
   --td-profile-mid: 213 194 217;
   --td-profile-deep: 93 65 99;
@@ -121,6 +129,9 @@ body {
   }
   .status-region--error {
     color: rgb(var(--td-danger));
+  }
+  .status-region--populated {
+    margin-bottom: 1rem;
   }
   .page-heading {
     color: rgb(var(--td-forest-deep));
@@ -209,6 +220,7 @@ body {
   .profile-color-option {
     display: flex;
     min-height: 2.75rem;
+    min-width: 0;
     align-items: center;
     gap: 0.5rem;
     padding: 0.45rem 0.7rem;
@@ -224,22 +236,145 @@ body {
   }
   .profile-color-option--selected {
     border-color: rgb(var(--td-forest));
-    background: rgb(var(--td-forest-soft));
+    background: rgb(var(--td-paper));
+  }
+  .profile-color-option--selected .profile-color-swatch {
+    background: rgb(var(--td-profile-light)) !important;
+  }
+  .profile-color-option__label {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .profile-color-swatch {
+    flex: 0 0 1rem;
     width: 1rem;
     height: 1rem;
     border-radius: 999px;
     box-shadow: 0 0 0 1px rgb(var(--td-bark) / 0.2);
   }
-  .member-card {
+  .profile-color-preview {
+    padding: 1rem;
+    border: 1px solid rgb(var(--td-profile-mid));
+    border-radius: var(--td-radius-control);
+    background: rgb(var(--td-profile-light));
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease;
+  }
+  .profile-color-preview__fieldset {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+  .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+  .app-navigation-link {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--td-radius-control);
+    font-weight: 650;
+  }
+  .app-navigation-link:hover {
+    background: rgb(var(--td-profile-on-color) / 0.1);
+  }
+  .app-navigation-link.router-link-exact-active {
+    border-color: rgb(var(--td-profile-on-color));
+    background: rgb(var(--td-profile-on-color) / 0.08);
+  }
+  .app-navigation-link:focus-visible {
+    outline: 2px solid rgb(var(--td-profile-on-color));
+    outline-offset: 2px;
+  }
+  .bootstrap-page--directory {
+    width: 100%;
+  }
+  .family-page {
+    display: grid;
+    gap: 1.5rem;
+  }
+  .family-page__heading {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .family-directory {
+    margin: 0 -1rem;
+    border-top: 1px solid rgb(var(--td-border));
+    border-bottom: 1px solid rgb(var(--td-border));
+  }
+  .family-member {
     display: flex;
     min-width: 0;
+    align-items: flex-start;
+    flex-wrap: wrap;
     gap: 0.75rem;
     padding: 1rem;
-    border: 1px solid rgb(var(--td-border));
-    border-radius: var(--td-radius-control);
+    border-bottom: 1px solid rgb(var(--td-border));
     background: rgb(var(--td-paper));
+  }
+  .family-member:last-child {
+    border-bottom: 0;
+  }
+  .family-member__identity {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .family-member__metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.6rem;
+    margin-top: 0.25rem;
+  }
+  .family-role-token {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid rgb(var(--td-forest));
+    border-radius: 999px;
+    color: rgb(var(--td-forest-deep));
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .family-member__action {
+    flex: 1 0 calc(100% - 1.75rem);
+    margin: -0.15rem 0 0 1.75rem;
+  }
+
+  @media (min-width: 40rem) {
+    .family-directory {
+      margin: 0;
+      border-right: 1px solid rgb(var(--td-border));
+      border-left: 1px solid rgb(var(--td-border));
+      border-radius: var(--td-radius-control);
+      overflow: hidden;
+    }
+    .family-member {
+      flex-wrap: nowrap;
+      padding: 1rem 1.25rem;
+    }
+    .family-member__action {
+      flex: 0 0 auto;
+      margin: -0.25rem 0 0;
+    }
+  }
+}
+
+@media (max-width: 39.99rem) {
+  .bootstrap-form-surface {
+    margin-right: -1rem;
+    margin-left: -1rem;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 }
 

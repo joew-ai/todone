@@ -19,6 +19,16 @@ interface ProfileFixture {
   version: number;
 }
 
+interface DirectoryMember {
+  memberId: string;
+  username: string;
+  role: 'parent' | 'child';
+  activationState: 'ACTIVE' | 'PENDING_ACTIVATION';
+  displayName: string;
+  color: ProfileFixture['color'];
+  allowedActions: string[];
+}
+
 const existingProfile: ProfileFixture = {
   memberId: 'synthetic-member',
   displayName: 'River',
@@ -84,6 +94,7 @@ async function mockCognito(page: Page): Promise<void> {
 async function mockProfileAndDirectory(
   page: Page,
   initialProfile: ProfileFixture | null,
+  directoryMembers?: DirectoryMember[],
 ): Promise<void> {
   let profile = initialProfile;
   await page.route('**/api/v1/profiles/me', async (route) => {
@@ -108,7 +119,7 @@ async function mockProfileAndDirectory(
     await route.fulfill({
       json: {
         members: profile
-          ? [
+          ? (directoryMembers ?? [
               {
                 memberId: profile.memberId,
                 username: 'parentone',
@@ -118,7 +129,7 @@ async function mockProfileAndDirectory(
                 color: profile.color,
                 allowedActions: [],
               },
-            ]
+            ])
           : [],
       },
     });
@@ -206,9 +217,13 @@ test('restores only the current tab from sessionStorage and completely clears si
   await signIn(page, () => membership);
   await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
   await expect(page.getByText('River House')).toBeVisible();
-  await page.getByRole('button', { name: 'Edit my profile' }).click();
+  await expect(page.getByRole('link', { name: 'Family' })).toHaveClass(/router-link-exact-active/);
+  await page.getByRole('link', { name: 'Edit my profile' }).first().click();
   await expect(page).toHaveURL(/\/profile$/);
   await expect(page.getByRole('heading', { name: 'Edit my profile' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'My profile' })).toHaveClass(
+    /router-link-exact-active/,
+  );
   await page.goBack();
   await expect(page).toHaveURL(/\/family$/);
   await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
@@ -244,6 +259,51 @@ test('restores only the current tab from sessionStorage and completely clears si
       ),
     ),
   ).toEqual([]);
+});
+
+test('renders a readable active and pending family directory without invented actions', async ({
+  page,
+}) => {
+  await mockProfileAndDirectory(page, existingProfile, [
+    {
+      memberId: membership.memberId,
+      username: 'parentone',
+      role: 'parent',
+      activationState: 'ACTIVE',
+      displayName: 'River',
+      color: 'PINE',
+      allowedActions: [],
+    },
+    {
+      memberId: 'child-member',
+      username: 'juniper-and-the-river-stone',
+      role: 'child',
+      activationState: 'ACTIVE',
+      displayName: 'A very long family display name that still wraps naturally',
+      color: 'LAKE',
+      allowedActions: [],
+    },
+    {
+      memberId: 'pending-parent',
+      username: 'morgan-vale',
+      role: 'parent',
+      activationState: 'PENDING_ACTIVATION',
+      displayName: 'Morgan Vale',
+      color: 'PINE',
+      allowedActions: ['RESEND_WELCOME', 'CHANGE_EMAIL_AND_RESEND', 'CANCEL_PENDING_ACCOUNT'],
+    },
+  ]);
+  await signIn(page, () => membership);
+
+  const directory = page.getByRole('list', { name: 'Household members' });
+  await expect(directory).toContainText('@juniper-and-the-river-stone');
+  await expect(directory).not.toContainText('Child');
+  await expect(directory).not.toContainText('Active');
+  await expect(directory).not.toContainText('Lake');
+  await expect(directory.getByText('Parent')).toHaveCount(2);
+  await expect(directory).toContainText('Morgan Vale');
+  await expect(directory).toContainText('Pending activation');
+  await expect(directory.getByRole('button')).toHaveCount(0);
 });
 
 test('supports parent Forgot Password without account disclosure', async ({ page }) => {
@@ -352,5 +412,10 @@ test('routes an active child to the Todo work-in-progress page without Todo traf
   await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('My Todos');
   await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('My profile');
   await expect(page.locator('html')).toHaveAttribute('data-profile-color', 'PINE');
+  await page.getByRole('link', { name: 'My profile' }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByRole('heading', { name: 'Edit my profile' })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/todos$/);
   expect(todoRequests).toBe(0);
 });

@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const localApiProxyTarget = process.env.TODONE_API_PROXY_TARGET ?? 'http://localhost:3001';
+
 export default defineConfig({
   // amazon-cognito-identity-js bundles a Node `buffer` shim that references
   // the bare `global` identifier, which does not exist in the browser under
@@ -49,8 +51,16 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: localApiProxyTarget,
         changeOrigin: true,
+      },
+      // Cognito Local does not provide browser CORS headers. Keep the
+      // development-only USER_PASSWORD_AUTH request same-origin while the
+      // local API continues to reach the emulator directly on port 9229.
+      '/cognito': {
+        target: 'http://localhost:9229',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/cognito/, ''),
       },
     },
   },

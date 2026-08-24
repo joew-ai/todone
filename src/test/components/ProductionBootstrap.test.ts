@@ -341,10 +341,14 @@ describe('ProductionBootstrap', () => {
     const wrapper = mountBootstrap();
     await flushPromises();
     expect(wrapper.text()).toContain('@parent-one');
-    await wrapper.get('button.secondary').trigger('click');
+    expect(wrapper.text()).not.toContain('Active');
+    expect(wrapper.text()).not.toContain('Pine');
+    await wrapper.get('.family-member__action').trigger('click');
     await flushPromises();
+    expect(wrapper.get('.profile-color-preview').attributes('data-profile-color')).toBe('PINE');
     await wrapper.get('input[autocomplete="nickname"]').setValue('River Two');
     await wrapper.get('input[value="LAKE"]').setValue();
+    expect(wrapper.get('.profile-color-preview').attributes('data-profile-color')).toBe('LAKE');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(saveMyProfile).toHaveBeenCalledWith('id-token', {
@@ -353,6 +357,13 @@ describe('ProductionBootstrap', () => {
       version: 1,
     });
     expect(wrapper.text()).toContain('Profile updated.');
+  });
+
+  it('offers the runtime IANA timezone list instead of a curated subset', async () => {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    const wrapper = mountBootstrap();
+    await flushPromises();
+    expect(wrapper.get('option[value="Africa/Abidjan"]').exists()).toBe(true);
   });
 
   it('clears private rendered state on sign-out', async () => {

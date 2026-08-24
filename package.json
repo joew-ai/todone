@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "tsx local-dev/server.ts",
     "dev:cognito": "cognito-local",
-    "dev:full": "concurrently -k -s first \"npm:dev\" \"npm:dev:api\" \"npm:dev:cognito\"",
+    "dev:full": "concurrently -k -s first \"TODONE_API_PROXY_TARGET=http://localhost:3002 VITE_COGNITO_LOCAL_ENDPOINT=http://localhost:3001/cognito npm run dev -- --port 3001 --strictPort\" \"PORT=3002 npm run dev:api\" \"npm:dev:cognito\"",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "format": "prettier --write .",

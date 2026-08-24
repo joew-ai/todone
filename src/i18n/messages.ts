@@ -103,9 +103,11 @@ interface EnglishMessages {
     loadFailed: string;
     retry: string;
     empty: string;
+    memberDirectory: string;
     username: string;
     role: string;
     status: string;
+    color: string;
     parent: string;
     child: string;
     active: string;

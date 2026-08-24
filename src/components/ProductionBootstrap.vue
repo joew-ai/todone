@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { loadAuthConfig } from '../config/authConfig';
 import { messages } from '../i18n/messages';
 import { applyMembershipContext } from '../presentation/appContext';
@@ -49,16 +49,7 @@ const routeByAuthScreen = {
 const route = useRoute();
 const router = useRouter();
 
-const supportedTimezones = [
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/New_York',
-  'Europe/London',
-  'Europe/Paris',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-];
+const supportedTimezones = availableIanaTimezones();
 const copy = messages.bootstrap;
 const profileCopy = messages.profileSetup;
 const familyCopy = messages.familyManagement;
@@ -67,7 +58,6 @@ const profileColors = Object.values(ProfileColor).map((color) => ({
   hex: ProfileColorHex[color],
   label: color.charAt(0) + color.slice(1).toLowerCase(),
 }));
-
 const transientScreen = ref<TransientScreen | null>(DEFAULT_TRANSIENT_SCREEN);
 const screen = computed<Screen>(() => {
   const routeName = route.name as AppRouteNameType;
@@ -108,6 +98,13 @@ watch(screen, (currentScreen) => {
   }
   void focusRouteHeading();
 });
+
+watch(
+  () => route.name,
+  (routeName) => {
+    if (routeName === AppRouteName.profile) prepareProfileEdit();
+  },
+);
 
 onMounted(async () => {
   try {
@@ -242,7 +239,7 @@ async function resolveProfile(idToken: string): Promise<void> {
     return;
   }
   applyProfileTone(profile.value.color);
-  if (membership.value?.role === 'child') {
+  if (membership.value?.role === 'child' && route.name !== AppRouteName.profile) {
     await clearTransientScreenAndNavigate(AppRouteName.todos);
     return;
   }
@@ -354,12 +351,11 @@ async function retryProfile(): Promise<void> {
   await resolveProfile(token);
 }
 
-function beginProfileEdit(): void {
+function prepareProfileEdit(): void {
   if (!profile.value) return;
   displayName.value = profile.value.displayName;
   profileColor.value = profile.value.color;
   fieldError.value = {};
-  void navigate(AppRouteName.profile);
 }
 
 async function retryFamilyManagement(): Promise<void> {
@@ -370,7 +366,6 @@ async function retryFamilyManagement(): Promise<void> {
 
 function cancelProfileEdit(): void {
   fieldError.value = {};
-  void navigate(AppRouteName.family);
 }
 
 function signOut(message = copy.signedOut): void {
@@ -475,6 +470,18 @@ function browserTimezone(): string {
   }
 }
 
+function availableIanaTimezones(): string[] {
+  try {
+    if (typeof Intl.supportedValuesOf === 'function') {
+      return Intl.supportedValuesOf('timeZone');
+    }
+  } catch {
+    // The selected browser timezone remains a valid fallback for older engines.
+  }
+  const detected = browserTimezone();
+  return detected ? [detected] : [];
+}
+
 async function focusFirstField(): Promise<void> {
   await nextTick();
   firstField.value?.focus();
@@ -490,12 +497,23 @@ async function focusRouteHeading(): Promise<void> {
 </script>
 
 <template>
-  <section class="surface-card mx-auto max-w-xl p-5 sm:p-8">
+  <section
+    :class="
+      screen === 'family-management' ||
+      screen === 'family-loading' ||
+      screen === 'family-load-error'
+        ? 'bootstrap-page bootstrap-page--directory'
+        : 'bootstrap-form-surface surface-card mx-auto max-w-xl p-5 sm:p-8'
+    "
+  >
     <div class="min-h-6" role="status" aria-live="polite">
       <p
         v-if="status"
         class="status-region text-sm"
-        :class="{ 'status-region--error': statusIsError }"
+        :class="{
+          'status-region--error': statusIsError,
+          'status-region--populated': status,
+        }"
       >
         {{ status }}
       </p>
@@ -731,49 +749,61 @@ async function focusRouteHeading(): Promise<void> {
           fieldError.displayName
         }}</span></label
       >
-      <fieldset :aria-describedby="fieldError.color ? 'profile-color-error' : undefined">
-        <legend class="body-strong font-medium">{{ profileCopy.color }}</legend>
-        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <label
-            v-for="color in profileColors"
-            :key="color.id"
-            class="profile-color-option"
-            :class="{ 'profile-color-option--selected': profileColor === color.id }"
-          >
-            <input
-              v-model="profileColor"
-              type="radio"
-              name="profile-color"
-              :value="color.id"
-              :disabled="busy"
-            />
-            <span
-              class="profile-color-swatch"
-              :style="{ backgroundColor: color.hex }"
-              aria-hidden="true"
-            />
-            <span>{{ color.label }}</span>
-          </label>
-        </div>
-        <span id="profile-color-error" class="error">{{ fieldError.color }}</span>
-      </fieldset>
-      <button class="primary" type="submit" :disabled="busy">
-        {{
-          busy
-            ? profileCopy.saving
-            : screen === 'profile-edit'
-              ? familyCopy.saveProfile
-              : profileCopy.save
-        }}
-      </button>
-      <button
-        type="button"
-        class="link"
-        :disabled="busy"
-        @click="screen === 'profile-edit' ? cancelProfileEdit() : signOut()"
-      >
-        {{ screen === 'profile-edit' ? familyCopy.cancel : copy.signOut }}
-      </button>
+      <div class="profile-color-preview" :data-profile-color="profileColor || undefined">
+        <fieldset
+          class="profile-color-preview__fieldset"
+          :aria-describedby="fieldError.color ? 'profile-color-error' : undefined"
+        >
+          <legend class="body-strong font-medium">{{ profileCopy.color }}</legend>
+          <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <label
+              v-for="color in profileColors"
+              :key="color.id"
+              class="profile-color-option"
+              :class="{ 'profile-color-option--selected': profileColor === color.id }"
+            >
+              <input
+                v-model="profileColor"
+                type="radio"
+                name="profile-color"
+                :value="color.id"
+                :disabled="busy"
+              />
+              <span
+                class="profile-color-swatch"
+                :style="{ backgroundColor: color.hex }"
+                aria-hidden="true"
+              />
+              <span class="profile-color-option__label">{{ color.label }}</span>
+            </label>
+          </div>
+          <span id="profile-color-error" class="error">{{ fieldError.color }}</span>
+        </fieldset>
+      </div>
+      <div class="form-actions">
+        <button class="primary" type="submit" :disabled="busy">
+          {{
+            busy
+              ? profileCopy.saving
+              : screen === 'profile-edit'
+                ? familyCopy.saveProfile
+                : profileCopy.save
+          }}
+        </button>
+        <RouterLink
+          v-if="screen === 'profile-edit'"
+          :to="{ name: membership?.role === 'child' ? AppRouteName.todos : AppRouteName.family }"
+          class="link inline-flex items-center"
+          :aria-disabled="busy"
+          :tabindex="busy ? -1 : undefined"
+          @click="busy ? $event.preventDefault() : cancelProfileEdit()"
+        >
+          {{ familyCopy.cancel }}
+        </RouterLink>
+        <button v-else type="button" class="link" :disabled="busy" @click="signOut()">
+          {{ copy.signOut }}
+        </button>
+      </div>
     </form>
 
     <div v-else-if="screen === 'family-loading'" aria-busy="true">
@@ -790,49 +820,43 @@ async function focusRouteHeading(): Promise<void> {
       <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>
     </div>
 
-    <div v-else-if="screen === 'family-management' && membership" class="space-y-5">
-      <div class="flex flex-wrap items-start justify-between gap-3">
+    <div v-else-if="screen === 'family-management' && membership" class="family-page">
+      <div class="family-page__heading">
         <div>
           <p class="meta-label text-sm">{{ copy.ready }}</p>
           <h2 class="page-heading text-2xl">{{ familyCopy.heading }}</h2>
           <p class="body-muted mt-1 text-sm">{{ membership.household.name }}</p>
         </div>
-        <button type="button" class="secondary" @click="beginProfileEdit">
-          {{ familyCopy.editProfile }}
-        </button>
       </div>
       <p v-if="familyMembers.length === 0" class="body-secondary">{{ familyCopy.empty }}</p>
-      <ul v-else class="grid gap-3 sm:grid-cols-2">
-        <li v-for="member in familyMembers" :key="member.memberId" class="member-card">
+      <ul v-else class="family-directory" :aria-label="familyCopy.memberDirectory">
+        <li v-for="member in familyMembers" :key="member.memberId" class="family-member">
           <span
             class="profile-color-swatch"
             :style="{ backgroundColor: ProfileColorHex[member.color] }"
             aria-hidden="true"
           />
-          <div class="min-w-0 flex-1">
+          <div class="family-member__identity">
             <p class="body-strong font-medium">{{ member.displayName }}</p>
-            <dl class="body-secondary mt-2 grid gap-1 text-sm">
+            <dl class="family-member__metadata body-secondary text-sm">
               <div>
                 <dt class="sr-only">{{ familyCopy.username }}</dt>
                 <dd>@{{ member.username }}</dd>
               </div>
-              <div>
-                <dt class="inline font-medium">{{ familyCopy.role }}:</dt>
-                <dd class="inline">
-                  {{ member.role === 'parent' ? familyCopy.parent : familyCopy.child }}
-                </dd>
-              </div>
-              <div>
-                <dt class="inline font-medium">{{ familyCopy.status }}:</dt>
-                <dd class="inline">
-                  {{ member.activationState === 'ACTIVE' ? familyCopy.active : familyCopy.pending }}
-                </dd>
+              <div v-if="member.role === 'parent'" class="family-role-token">
+                <dt class="sr-only">{{ familyCopy.role }}</dt>
+                <dd>{{ familyCopy.parent }}</dd>
               </div>
             </dl>
-            <p v-if="member.allowedActions.length" class="body-muted mt-2 text-sm">
-              {{ familyCopy.pendingActions }}
-            </p>
           </div>
+          <RouterLink
+            v-if="member.memberId === membership.memberId"
+            :to="{ name: AppRouteName.profile }"
+            class="link family-member__action"
+            @click="prepareProfileEdit"
+          >
+            {{ familyCopy.editProfile }}
+          </RouterLink>
         </li>
       </ul>
       <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>

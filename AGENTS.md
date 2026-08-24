@@ -91,6 +91,13 @@
 - Consistent design tokens
 - Visual screenshots reviewed for meaningful UI changes
 
+## Confirmed UI review conventions
+
+- On compact layouts, prefer continuous full-width page and list surfaces over nested rounded cards; reserve bounded cards for focused forms, dialogs, and exceptional secondary detail.
+- Use links for navigation, including row-level and compact navigation. Reserve buttons for mutations, submission, confirmation, or another action that changes state.
+- Make the current route visually unambiguous in persistent navigation. Group primary submit and cancel/navigation controls with deliberate spacing rather than relying on incidental form rhythm.
+- When a compact form does not need the containment of a dialog or focused secondary detail, use a continuous full-width surface rather than a mobile card.
+
 ## Prohibited actions
 
 - Do not deploy.

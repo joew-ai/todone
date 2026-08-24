@@ -26,7 +26,7 @@ const hasApplicationNavigation = computed(() => activeMembershipRole.value !== n
         <RouterLink
           v-if="activeMembershipRole === 'child'"
           :to="{ name: AppRouteName.todos }"
-          class="flex min-h-11 items-center gap-2 rounded-control px-3 font-medium hover:bg-profile-on/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          class="app-navigation-link"
         >
           <ListTodo :size="18" aria-hidden="true" />
           My Todos
@@ -34,15 +34,12 @@ const hasApplicationNavigation = computed(() => activeMembershipRole.value !== n
         <RouterLink
           v-if="activeMembershipRole === 'parent'"
           :to="{ name: AppRouteName.family }"
-          class="flex min-h-11 items-center gap-2 rounded-control px-3 font-medium hover:bg-profile-on/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          class="app-navigation-link"
         >
           <UsersRound :size="18" aria-hidden="true" />
           Family
         </RouterLink>
-        <RouterLink
-          :to="{ name: AppRouteName.profile }"
-          class="flex min-h-11 items-center gap-2 rounded-control px-3 font-medium hover:bg-profile-on/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        >
+        <RouterLink :to="{ name: AppRouteName.profile }" class="app-navigation-link">
           <UserRound :size="18" aria-hidden="true" />
           My profile
         </RouterLink>

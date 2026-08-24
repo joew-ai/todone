@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Todone family-account management reference</title>
+    <style>
+      :root { color-scheme: light; --bark:#2e2925; --muted:#6f675f; --forest:#1f563f; --deep:#143d2e; --canvas:#f6f1e8; --paper:#fffcf6; --line:#d8cec0; --danger:#a44232; --danger-soft:#faebe7; --success:#28624a; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--canvas); color:var(--bark); font:16px/1.45 Avenir Next,Avenir,Segoe UI,Inter,system-ui,sans-serif; }
+      button,input,select { font:inherit; }
+      .note { margin:0; padding:.7rem 1rem; background:var(--bark); color:var(--paper); text-align:center; font-size:.9rem; }
+      .note strong { color:#dcebdc; }
+      .review-switcher { display:grid; gap:.35rem; max-width:1120px; margin:1rem auto; padding:0 1rem; color:var(--muted); font-size:.85rem; }
+      .review-switcher select { min-height:2.75rem; }
+      .shell { max-width:1120px; margin:1.25rem auto 3rem; overflow:hidden; border:1px solid var(--line); border-radius:1.2rem; background:var(--paper); box-shadow:0 12px 32px rgb(46 41 37 / .1); }
+      .topbar { display:flex; min-height:4.25rem; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; background:linear-gradient(120deg,var(--deep),var(--forest)); color:var(--paper); }
+      .brand { font-size:1.2rem; font-weight:750; letter-spacing:-.02em; }
+      .house { font-size:.9rem; opacity:.9; }
+      .body { display:grid; min-height:680px; }
+      .nav { display:none; padding:1rem; background:#f1eee7; }
+      .nav p { margin:.25rem .65rem .7rem; color:var(--muted); font-size:.8rem; }
+      .nav button { display:flex; min-height:2.5rem; align-items:center; padding:.45rem .6rem; border:0; border-radius:.65rem; background:transparent; color:var(--bark); cursor:pointer; text-align:left; }
+      .nav button[aria-pressed="true"] { background:#e3eee7; color:var(--deep); font-weight:700; }
+      .content { min-width:0; padding:1.15rem; }
+      .route { display:none; }
+      .heading { display:flex; flex-wrap:wrap; align-items:start; justify-content:space-between; gap:1rem; }
+      .eyebrow { margin:0 0 .25rem; color:var(--forest); font-size:.78rem; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+      h1 { margin:0; font-size:clamp(1.65rem,4vw,2.35rem); letter-spacing:-.04em; line-height:1.08; }
+      h2 { margin:0; font-size:1.05rem; letter-spacing:-.015em; }
+      .subtle { margin:.35rem 0 0; color:var(--muted); }
+      .button { display:inline-flex; min-height:2.75rem; align-items:center; justify-content:center; gap:.4rem; padding:.55rem .85rem; border:1px solid var(--forest); border-radius:.7rem; background:var(--forest); color:var(--paper); cursor:pointer; font-weight:700; text-decoration:none; }
+      .button--secondary { background:transparent; color:var(--deep); }
+      .button--danger { border-color:var(--danger); background:var(--danger); }
+      .route-actions { display:flex; flex-wrap:wrap; gap:1rem; margin:1.25rem 0; }
+      .nav-link { display:inline-flex; min-height:2.75rem; align-items:center; color:var(--deep); font-weight:750; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:.22rem; }
+      .nav-link::after { content:'→'; margin-left:.35rem; }
+      .actions { display:flex; flex-wrap:wrap; gap:.6rem; margin:1.25rem 0; }
+      .directory { display:grid; gap:0; margin:1.2rem 0; border-top:1px solid var(--line); }
+      .member { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.7rem; padding:1rem 0; border-bottom:1px solid var(--line); background:transparent; }
+      .swatch { width:1rem; height:1rem; margin-top:.25rem; border-radius:999px; box-shadow:0 0 0 1px rgb(46 41 37 / .2); }
+      .member-main { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.25rem .75rem; }
+      .member-name { margin:0; font-weight:750; }
+      .member-meta { margin:.25rem 0 0; color:var(--muted); font-size:.88rem; }
+      .member-actions { display:grid; grid-column:1 / -1; grid-template-columns:repeat(auto-fit,minmax(9rem,1fr)); gap:.35rem; margin-top:.35rem; }
+      .text-action,.row-action { display:flex; min-height:2.75rem; align-items:center; justify-content:space-between; padding:.45rem .1rem; border:0; border-bottom:1px solid rgb(31 86 63 / .2); background:transparent; color:var(--deep); cursor:pointer; font-weight:700; text-align:left; text-decoration:none; }
+      .text-action::after,.row-action::after { content:'→'; }
+      .status { color:var(--muted); font-size:.82rem; font-weight:650; }
+      .pending { box-shadow:inset 3px 0 #a8782f; }
+      .warning { margin:1rem 0; padding:.8rem .9rem; border:1px solid #d7b781; border-radius:.75rem; background:#fcf4e5; color:#67480d; }
+      .error { margin:1rem 0; padding:.8rem .9rem; border:1px solid #d59b90; border-radius:.75rem; background:var(--danger-soft); color:#793325; }
+      .form { display:grid; gap:.9rem; max-width:38rem; margin-top:1.2rem; }
+      label { display:grid; gap:.35rem; font-weight:650; }
+      input,select { min-height:2.75rem; padding:.55rem .7rem; border:1px solid var(--line); border-radius:.65rem; background:var(--paper); color:var(--bark); }
+      input:focus,select:focus,button:focus-visible { outline:3px solid rgb(33 111 79 / .3); outline-offset:2px; }
+      .help { margin:-.5rem 0 0; color:var(--muted); font-size:.88rem; }
+      .fieldset { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.5rem; }
+      .choice { display:flex; min-height:2.75rem; align-items:center; gap:.45rem; padding:.45rem .55rem; border:1px solid var(--line); border-radius:.65rem; font-size:.85rem; }
+      .choice input { min-height:auto; }
+      .tiny-swatch { width:.85rem; height:.85rem; border-radius:999px; }
+      .back { margin-top:1.1rem; color:var(--muted); font-size:.88rem; }
+      .modal { padding:1rem; border:1px solid var(--line); border-radius:.9rem; background:#fffdf8; box-shadow:0 10px 25px rgb(46 41 37 / .1); }
+      .modal h2 { margin-bottom:.45rem; }
+      .modal p { margin:.35rem 0 .8rem; }
+      .hidden { display:none; }
+      @media (max-width:767px) { .review-switcher { margin:.6rem 0; } .shell { margin:0; border:0; border-radius:0; box-shadow:none; } .topbar { border-radius:0; } .content { padding:1.4rem 1rem 2rem; } .directory { margin-left:-1rem; margin-right:-1rem; } .member { padding-left:1rem; padding-right:1rem; } .heading { display:block; } }
+      @media (min-width:768px) { .review-switcher { display:none; } .body { grid-template-columns:190px minmax(0,1fr); } .nav { display:block; } .nav button { width:100%; min-height:2.75rem; padding:.55rem .65rem; } .content { padding:1.7rem 2rem 2rem; } .member { grid-template-columns:1.1rem minmax(0,1fr) auto; } .member-actions { grid-column:auto; grid-template-columns:1fr; margin-top:0; min-width:9rem; } }
+    </style>
+  </head>
+  <body>
+    <p class="note"><strong>Reference only</strong> — route/state design review; no account operation is wired to Todone.</p>
+    <label class="review-switcher">Preview route/state<select id="state-picker"><option value="directory">Family directory</option><option value="child">Add child</option><option value="parent">Add parent</option><option value="profile">My profile</option><option value="security">Security</option><option value="pending">Pending parent actions</option><option value="reset">Child password reset</option><option value="remove">Remove child</option><option value="failure">Partial failure</option></select></label>
+    <main class="shell">
+      <header class="topbar"><span class="brand">Todone</span><span class="house">River House · Family</span></header>
+      <div class="body">
+        <nav class="nav" aria-label="Reference routes">
+          <p>Account management</p>
+          <button type="button" data-view="directory" aria-pressed="true">Family directory</button>
+          <button type="button" data-view="child">Add child</button>
+          <button type="button" data-view="parent">Add parent</button>
+          <button type="button" data-view="profile">My profile</button>
+          <button type="button" data-view="security">Security</button>
+          <button type="button" data-view="remove">Remove child</button>
+          <button type="button" data-view="failure">Partial failure</button>
+        </nav>
+        <section class="content" aria-live="polite">
+          <article data-panel="directory">
+            <p class="route">/family · Back → parent Todo home when that route exists</p>
+            <div class="heading"><div><p class="eyebrow">River House</p><h1>Family management</h1><p class="subtle">Account details stay clear; sensitive work opens only when needed.</p></div><div class="route-actions"><a class="nav-link" href="#child" data-switch="child">Add child</a><a class="nav-link" href="#parent" data-switch="parent">Add parent</a></div></div>
+            <div class="directory">
+              <article class="member"><span class="swatch" style="background:#337b8c" aria-hidden="true"></span><div><div class="member-main"><p class="member-name">River Chen</p><span class="status">Parent · Active</span></div><p class="member-meta">@river-chen · Lake</p></div><div class="member-actions"><a class="text-action" href="#profile" data-switch="profile">Edit my profile</a></div></article>
+              <article class="member"><span class="swatch" style="background:#6b7a3a" aria-hidden="true"></span><div><div class="member-main"><p class="member-name">A very long family display name that still wraps naturally</p><span class="status">Child · Active</span></div><p class="member-meta">@juniper-and-the-river-stone · Moss</p></div><div class="member-actions"><button class="row-action" type="button" data-switch="reset">Reset password</button><button class="row-action" type="button" data-switch="remove">Remove child</button></div></article>
+              <article class="member pending"><span class="swatch" style="background:#76507a" aria-hidden="true"></span><div><div class="member-main"><p class="member-name">Morgan Vale</p><span class="status">Parent · Pending activation</span></div><p class="member-meta">@morgan-vale · Dusk · Welcome email not shown here</p></div><div class="member-actions"><button class="row-action" type="button" data-switch="pending">Manage pending account</button></div></article>
+            </div>
+          </article>
+
+          <article class="hidden" data-panel="child">
+            <p class="route">/family/children/new · Back → /family</p><p class="eyebrow">New child account</p><h1>Add a child</h1><p class="subtle">They can sign in immediately after a parent creates a permanent password.</p>
+            <form class="form"><label>Username<input value="juniper-river" /><span class="help">3–24 lowercase letters, numbers, hyphens, or underscores. This cannot change.</span></label><label>Display name<input value="Juniper River" /></label><label>Profile color<span class="fieldset"><span class="choice"><input type="radio" name="child-color" checked /><span class="tiny-swatch" style="background:#6b7a3a"></span>Moss</span><span class="choice"><input type="radio" name="child-color" /><span class="tiny-swatch" style="background:#337b8c"></span>Lake</span><span class="choice"><input type="radio" name="child-color" /><span class="tiny-swatch" style="background:#b85c3f"></span>Clay</span><span class="choice"><input type="radio" name="child-color" /><span class="tiny-swatch" style="background:#76507a"></span>Dusk</span></span></label><label>Temporary password<input type="password" value="not-shown" /><span class="help">The password is never saved in the form after success.</span></label><button class="button" type="button">Create child account</button></form><p class="back">Cancel returns to Family management without creating an account.</p>
+          </article>
+
+          <article class="hidden" data-panel="parent">
+            <p class="route">/family/parents/new · Back → /family</p><p class="eyebrow">New parent account</p><h1>Add a parent</h1><p class="subtle">They choose their own password from the welcome email’s one-time setup code.</p>
+            <form class="form"><label>Username<input value="morgan-vale" /></label><label>Display name<input value="Morgan Vale" /></label><label>Recovery email<input type="email" value="" placeholder="name@example.com" /></label><label>Profile color<select><option>Dusk</option><option>Pine</option><option>Lake</option></select></label><button class="button" type="button">Send welcome email</button></form><p class="back">Back returns to Family management. Email and setup code never appear in this URL.</p>
+          </article>
+
+          <article class="hidden" data-panel="pending">
+            <p class="route">/family · Pending parent actions open from the member row</p><p class="eyebrow">Pending activation</p><h1>Morgan Vale</h1><p class="subtle">Parent · @morgan-vale · Dusk</p><div class="warning"><strong>Waiting for setup.</strong> Morgan must use the welcome email’s one-time setup code and choose their own password. An existing parent cannot activate this account.</div><div class="actions"><button class="button" type="button">Resend welcome email</button><button class="button button--secondary" type="button">Change email and resend</button><button class="button button--danger" type="button">Cancel pending account</button></div><p class="back">Canceling a focused action returns to the pending row with no account change.</p>
+          </article>
+
+          <article class="hidden" data-panel="profile">
+            <p class="route">/profile · Back → /family</p><p class="eyebrow">Your identity</p><h1>Edit my profile</h1><p class="subtle">Only your display name and profile color are editable.</p><form class="form"><label>Display name<input value="River Chen" /></label><label>Profile color<select><option>Lake</option><option>Pine</option><option>Moss</option></select></label><button class="button" type="button">Save profile</button></form>
+          </article>
+
+          <article class="hidden" data-panel="security">
+            <p class="route">/security · Back → /profile</p><p class="eyebrow">Private account detail</p><h1>Recovery email</h1><p class="subtle">Only you can see or change this address. The existing verified address remains active until the replacement is verified.</p><form class="form"><label>New recovery email<input type="email" value="" placeholder="name@example.com" /></label><button class="button" type="button">Send verification email</button></form>
+          </article>
+
+          <article class="hidden" data-panel="reset">
+            <p class="route">/family · Password reset opens from a child row</p><div class="modal"><p class="eyebrow">Child password reset</p><h2>Set a new password for Juniper River</h2><p>This signs Juniper out on every device. The password is not displayed after submission.</p><label>New password<input type="password" value="not-shown" /></label><div class="actions"><button class="button" type="button">Reset password</button><button class="button button--secondary" type="button" data-switch="directory">Cancel</button></div></div>
+          </article>
+
+          <article class="hidden" data-panel="remove">
+            <p class="route">/family · Confirmation remains focused over Family management</p><div class="modal"><p class="eyebrow">Remove child</p><h2>Remove Juniper River?</h2><p>This permanently removes the child account and its associated data. Juniper will be signed out. This cannot be undone.</p><div class="actions"><button class="button button--danger" type="button">Remove child account</button><button class="button button--secondary" type="button" data-switch="directory">Cancel</button></div></div>
+          </article>
+
+          <article class="hidden" data-panel="failure">
+            <p class="route">/family/children/new · Back → /family</p><p class="eyebrow">Recoverable state</p><h1>Add a child</h1><div class="error"><strong>We could not create this account. Nothing was confirmed.</strong><br />Try again. If it continues, contact the household operator with the request ID.</div><form class="form"><label>Username<input value="juniper-river" aria-invalid="true" /><span class="help">That username is already in use. Choose another.</span></label><label>Display name<input value="Juniper River" /></label><button class="button" type="button">Try again</button></form>
+          </article>
+        </section>
+      </div>
+    </main>
+    <script>
+      const panels = [...document.querySelectorAll('[data-panel]')];
+      const controls = [...document.querySelectorAll('[data-view], [data-switch]')];
+      function show(name) {
+        panels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.panel !== name));
+        document.querySelectorAll('[data-view]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === name)));
+        document.querySelector('#state-picker').value = name;
+      }
+      controls.forEach((control) => control.addEventListener('click', (event) => { event.preventDefault(); show(control.dataset.view || control.dataset.switch); }));
+      document.querySelector('#state-picker').addEventListener('change', (event) => show(event.target.value));
+    </script>
+  </body>
+</html>

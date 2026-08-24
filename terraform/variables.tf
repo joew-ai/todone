@@ -11,6 +11,13 @@ variable "allowed_origins" {
     condition     = length(var.allowed_origins) > 0 && !contains(var.allowed_origins, "*")
     error_message = "allowed_origins must be a non-empty list of explicit origins, not \"*\"."
   }
+
+  validation {
+    condition = length([
+      for origin in var.allowed_origins : origin if startswith(origin, "https://")
+    ]) == 1
+    error_message = "allowed_origins must include exactly one HTTPS production PWA origin."
+  }
 }
 
 variable "lambda_artifacts" {

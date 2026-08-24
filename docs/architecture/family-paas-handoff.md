@@ -37,6 +37,11 @@ Provide a dedicated Todone browser client:
 
 - It is a public client and MUST NOT require or expose a client secret in browser assets.
 - It supports the reviewed username/password and session refresh behavior selected for the PWA.
+- It MUST set an explicit empty Cognito `WriteAttributes` list for Todone. An authenticated browser
+  client therefore cannot directly call `UpdateUserAttributes` to replace `email`; Todone's
+  parent-authorized server API owns that transition. This restriction does not replace initial
+  first-parent signup with email or browser-side verification, both of which require dedicated
+  regression evidence.
 - Callback, logout, and allowed-origin configuration is limited to explicit local development origins and the production Todone origin.
 - Token validity and revocation settings are documented for Todone session handling.
 

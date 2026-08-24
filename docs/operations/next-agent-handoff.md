@@ -63,6 +63,13 @@ The separate `establish-visual-design-foundation` change has implementation task
 
 Tasks 2.4–2.5 own the remaining Cognito configuration. They configure the source-controlled static invitation template and built-in delivery, retain the old verified recovery email until replacement verification, and restrict browser email writes. No SES custom sender is planned. The first application vertical slice should follow only after that infrastructure contract is complete.
 
+Task 2.5 has one external dependency: the pinned `family-paas` app-client module must expose an
+explicit `write_attributes` input so Todone can set it to `[]`. The reviewed request is
+`docs/architecture/family-paas-write-attributes-change-request.md`; do not fork or replace the
+separately owned module locally. The current root Terraform contains the pool-side invitation and
+staged-email settings, but task 2.5 remains incomplete until the module change, in-place plan, and
+browser regression evidence are available.
+
 ## Suggested file-level plan
 
 1. Implement and validate tasks 2.4–2.5 without apply.

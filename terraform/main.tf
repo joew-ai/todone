@@ -20,6 +20,9 @@ locals {
     "cognito-idp:AdminUpdateUserAttributes",
     "cognito-idp:AdminUserGlobalSignOut",
   ]
+  canonical_pwa_origin = one([
+    for origin in var.allowed_origins : origin if startswith(origin, "https://")
+  ])
 }
 
 # Every family-paas module below is pinned to this reviewed commit
@@ -61,6 +64,28 @@ resource "aws_cognito_user_pool" "todone" {
 
   admin_create_user_config {
     allow_admin_create_user_only = false
+
+    invite_message_template {
+      email_subject = "Set up your Todone parent account"
+      email_message = <<-HTML
+        <!doctype html>
+        <html lang="en">
+          <body>
+            <h1>Welcome to Todone</h1>
+            <p>Your username is <strong>{username}</strong>.</p>
+            <p>Your one-time setup code is <strong>{####}</strong>.</p>
+            <p><a href="${local.canonical_pwa_origin}/activate-parent">Activate your parent account</a></p>
+            <p>Choose a password with at least 8 characters, including an uppercase letter, lowercase letter, number, and symbol.</p>
+          </body>
+        </html>
+      HTML
+    }
+  }
+
+  # Cognito sends the static invitation through its built-in low-volume sender.
+  # Do not configure SES, a custom sender, or a custom-message Lambda.
+  email_configuration {
+    email_sending_account = "COGNITO_DEFAULT"
   }
 
   account_recovery_setting {
@@ -68,6 +93,12 @@ resource "aws_cognito_user_pool" "todone" {
       name     = "verified_email"
       priority = 1
     }
+  }
+
+  # Cognito keeps the previously verified recovery address usable until the
+  # replacement address completes verification.
+  user_attribute_update_settings {
+    attributes_require_verification_before_update = ["email"]
   }
 
   lambda_config {

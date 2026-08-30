@@ -117,6 +117,14 @@ interface EnglishMessages {
     profileSaved: string;
     cancel: string;
     pendingActions: string;
+    createChild: string;
+    createChildHelp: string;
+    childDisplayName: string;
+    childPassword: string;
+    createChildAction: string;
+    creatingChild: string;
+    childCreated: string;
+    provisioningUnavailable: string;
   };
 }
 

@@ -4,6 +4,7 @@ export const HttpHeader = {
   accept: 'accept',
   authorization: 'authorization',
   contentType: 'content-type',
+  idempotencyKey: 'idempotency-key',
 } as const;
 export const APPLICATION_JSON = 'application/json';
 export const HttpMethod = { get: 'GET', post: 'POST', put: 'PUT' } as const;

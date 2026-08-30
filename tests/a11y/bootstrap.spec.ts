@@ -178,6 +178,18 @@ test('the child Todo work-in-progress route has no detectable WCAG A/AA violatio
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
 });
 
+test('the parent child-creation form has no detectable WCAG A/AA violations', async ({ page }) => {
+  await page.goto('/');
+  await signInAsParent(page);
+  await page.getByRole('link', { name: 'Create child account' }).click();
+  await expect(page.getByRole('heading', { name: 'Create child account' })).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+    .analyze();
+  expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
+});
+
 test('the parent family directory has no detectable WCAG A/AA violations', async ({ page }) => {
   await page.goto('/');
   await signInAsParent(page);

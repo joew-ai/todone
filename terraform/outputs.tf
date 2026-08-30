@@ -63,7 +63,10 @@ output "dynamodb_index_names" {
 }
 
 output "lambda_function_names" {
-  value = { for name, lambda in module.lambdas : name => lambda.function_name }
+  value = merge(
+    { for name, lambda in module.lambdas : name => lambda.function_name },
+    { "create-child" = module.create_child_lambda.function_name },
+  )
 }
 
 # Backward-compatible foundation outputs retained for release tooling that
@@ -73,7 +76,10 @@ output "lambda_function_name" {
 }
 
 output "lambda_function_arns" {
-  value = { for name, lambda in module.lambdas : name => lambda.function_arn }
+  value = merge(
+    { for name, lambda in module.lambdas : name => lambda.function_arn },
+    { "create-child" = module.create_child_lambda.function_arn },
+  )
 }
 
 output "lambda_function_arn" {
@@ -81,7 +87,10 @@ output "lambda_function_arn" {
 }
 
 output "lambda_qualified_arns" {
-  value = { for name, lambda in module.lambdas : name => lambda.qualified_arn }
+  value = merge(
+    { for name, lambda in module.lambdas : name => lambda.qualified_arn },
+    { "create-child" = module.create_child_lambda.qualified_arn },
+  )
 }
 
 output "lambda_qualified_arn" {
@@ -89,7 +98,10 @@ output "lambda_qualified_arn" {
 }
 
 output "lambda_versions" {
-  value = { for name, lambda in module.lambdas : name => lambda.version }
+  value = merge(
+    { for name, lambda in module.lambdas : name => lambda.version },
+    { "create-child" = module.create_child_lambda.version },
+  )
 }
 
 output "lambda_version" {
@@ -107,6 +119,7 @@ output "family_account_admin_role_arn" {
 output "log_group_names" {
   value = concat(
     [for lambda in values(module.lambdas) : lambda.log_group_name],
+    [module.create_child_lambda.log_group_name],
     [module.api.access_log_group_name],
   )
 }

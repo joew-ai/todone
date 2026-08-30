@@ -14,6 +14,7 @@ interface LambdaMessages {
     accessUnavailable: string;
     reauthenticationRequired: string;
     internalError: string;
+    usernameConflict: string;
   };
   cognitoAdministration: {
     usernameConflict: string;

@@ -85,7 +85,8 @@ async function resolveRouteAccess(to: RouteLocationNormalized) {
     isPublicRouteName(routeName) ||
     routeName === AppRouteName.householdSetup ||
     routeName === AppRouteName.profileSetup ||
-    (membership.role === 'child' && routeName === AppRouteName.family)
+    (membership.role === 'child' &&
+      (routeName === AppRouteName.family || routeName === AppRouteName.newChild))
   ) {
     return { name: homeRoute, replace: true };
   }

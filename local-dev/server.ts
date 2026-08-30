@@ -11,6 +11,7 @@ import { handler as sessionHandler } from '../lambdas/session/index';
 import { handler as currentMembershipHandler } from '../lambdas/households/current';
 import { handler as createHouseholdHandler } from '../lambdas/households/create';
 import { handler as familyDirectoryHandler } from '../lambdas/households/directory';
+import { handler as createChildHandler } from '../lambdas/households/children';
 import {
   readHandler as readProfileHandler,
   updateHandler as updateProfileHandler,
@@ -74,6 +75,14 @@ app.get('/api/v1/family-members', async (req, res) => {
   );
 });
 
+app.post('/api/v1/family-members/children', async (req, res) => {
+  await simulateLambda(
+    (event) => createChildHandler(event, { repository: householdRepository }),
+    req,
+    res,
+  );
+});
+
 app.put('/api/v1/profiles/me', async (req, res) => {
   await simulateLambda(
     (event) => updateProfileHandler(event, { repository: householdRepository }),
@@ -92,6 +101,7 @@ const server = app.listen(PORT, () => {
   console.log('  GET /api/v1/profiles/me');
   console.log('  PUT /api/v1/profiles/me');
   console.log('  GET /api/v1/family-members');
+  console.log('  POST /api/v1/family-members/children');
 });
 
 // tsx currently lets this module exit after the Express listener is initialized.

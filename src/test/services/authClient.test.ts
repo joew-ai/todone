@@ -81,7 +81,7 @@ vi.mock('@aws-sdk/client-cognito-identity-provider', () => {
   return { CognitoIdentityProviderClient, InitiateAuthCommand, SignUpCommand };
 });
 
-const { AuthClient } = await import('../../services/authClient');
+const { AuthClient, AuthSessionUnavailableError } = await import('../../services/authClient');
 
 interface MockCallbacks {
   onSuccess: (session: unknown) => void;
@@ -346,6 +346,20 @@ describe('AuthClient', () => {
 
     getSignInUserSessionMock.mockReturnValue(session);
     expect(client.getIdToken()).toBe('fresh-token');
+  });
+
+  it('requireIdToken centralizes the missing-session guard for authenticated actions', async () => {
+    const client = buildClient();
+    expect(() => client.requireIdToken()).toThrow(AuthSessionUnavailableError);
+
+    const session = buildSession({ idToken: 'fresh-token' });
+    authenticateUserMock.mockImplementation((_details, callbacks: MockCallbacks) => {
+      callbacks.onSuccess(session);
+    });
+    await client.signIn('parent1', 'correct-password');
+    getSignInUserSessionMock.mockReturnValue(session);
+
+    expect(client.requireIdToken()).toBe('fresh-token');
   });
 
   it('signOut clears the current user so getIdToken returns null again', async () => {

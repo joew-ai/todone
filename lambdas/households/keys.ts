@@ -37,6 +37,10 @@ export function bootstrapReplayKey(sub: string, idempotencyKey: string): Househo
   };
 }
 
+export function childProvisionReplayKey(sub: string, idempotencyKey: string): HouseholdStorageKey {
+  return { pk: `${HouseholdRecord.userPrefix}#${sub}`, sk: `IDEMPOTENCY#CHILD#${idempotencyKey}` };
+}
+
 export function inMemoryReplayKey(sub: string, idempotencyKey: string): string {
   return `${sub}\0${idempotencyKey}`;
 }

@@ -6,13 +6,24 @@ import { messages } from '../i18n/messages';
 import { applyMembershipContext } from '../presentation/appContext';
 import { applyProfileTone, clearProfileTone } from '../presentation/profileTone';
 import { meetsAccountPasswordPolicy } from '../services/accountPassword';
-import { AuthClient, type AuthActionResult } from '../services/authClient';
+import { isValidUsername, normalizeUsernameForCognito } from '../services/username';
+import {
+  AuthClient,
+  AuthSessionUnavailableError,
+  type AuthActionResult,
+} from '../services/authClient';
 import {
   createHousehold,
   fetchCurrentMembership,
   type CurrentMembership,
 } from '../services/householdClient';
-import { fetchFamilyMembers, type FamilyMember } from '../services/familyClient';
+import {
+  createChild,
+  fetchFamilyMembers,
+  type CreateChildInput,
+  type CreateChildResult,
+  type FamilyMember,
+} from '../services/familyClient';
 import {
   fetchMyProfile,
   ProfileColor,
@@ -38,6 +49,7 @@ type TransientScreen =
   | 'family-load-error';
 
 type Screen = BootstrapPageScreen | TransientScreen;
+type ChildFormInput = Omit<CreateChildInput, 'idempotencyKey'>;
 
 const DEFAULT_TRANSIENT_SCREEN: TransientScreen = 'restoring';
 const routeByAuthScreen = {
@@ -79,15 +91,28 @@ const displayName = ref('');
 const profileColor = ref<ProfileColorId | ''>('');
 const profile = ref<Profile | null>(null);
 const familyMembers = ref<FamilyMember[]>([]);
+const childUsername = ref('');
+const childDisplayName = ref('');
+const childColor = ref<ProfileColorId | ''>('');
+const childPassword = ref('');
+const childProvisioningBlocked = ref(false);
 const fieldError = ref<Record<string, string>>({});
 const firstField = ref<{ focus(): void } | null>(null);
 const registrationPasswordField = ref<{ focus(): void } | null>(null);
 const resetPasswordField = ref<{ focus(): void } | null>(null);
+const childUsernameField = ref<{ focus(): void } | null>(null);
+const childPasswordField = ref<{ focus(): void } | null>(null);
 let idempotencyKey = globalThis.crypto.randomUUID();
+let childIdempotencyKey = globalThis.crypto.randomUUID();
 let authClient: AuthClient | null = null;
 
 watch([householdName, timezone], () => {
   idempotencyKey = globalThis.crypto.randomUUID();
+});
+
+watch([childUsername, childDisplayName, childColor], () => {
+  childIdempotencyKey = globalThis.crypto.randomUUID();
+  childProvisioningBlocked.value = false;
 });
 
 watch(screen, (currentScreen) => {
@@ -103,6 +128,7 @@ watch(
   () => route.name,
   (routeName) => {
     if (routeName === AppRouteName.profile) prepareProfileEdit();
+    if (routeName !== AppRouteName.newChild) clearChildForm();
   },
 );
 
@@ -243,6 +269,10 @@ async function resolveProfile(idToken: string): Promise<void> {
     await clearTransientScreenAndNavigate(AppRouteName.todos);
     return;
   }
+  if (route.name === AppRouteName.newChild) {
+    transientScreen.value = null;
+    return;
+  }
   if (route.name === AppRouteName.profile) {
     displayName.value = profile.value.displayName;
     profileColor.value = profile.value.color;
@@ -284,8 +314,7 @@ async function submitHousehold(): Promise<void> {
     return;
   }
   await run(async () => {
-    const token = client().getIdToken();
-    if (!token) return signOut(copy.sessionEnded);
+    const token = client().requireIdToken();
     const result = await createHousehold(token, {
       name: householdName.value,
       timezone: timezone.value,
@@ -319,8 +348,7 @@ async function submitProfile(): Promise<void> {
     return;
   }
   await run(async () => {
-    const token = client().getIdToken();
-    if (!token) return signOut(copy.sessionEnded);
+    const token = client().requireIdToken();
     const result = await saveMyProfile(token, {
       displayName: trimmedDisplayName,
       color: profileColor.value as ProfileColorId,
@@ -346,9 +374,7 @@ async function submitProfile(): Promise<void> {
 }
 
 async function retryProfile(): Promise<void> {
-  const token = client().getIdToken();
-  if (!token) return signOut(copy.sessionEnded);
-  await resolveProfile(token);
+  await run(async () => resolveProfile(client().requireIdToken()));
 }
 
 function prepareProfileEdit(): void {
@@ -359,13 +385,81 @@ function prepareProfileEdit(): void {
 }
 
 async function retryFamilyManagement(): Promise<void> {
-  const token = client().getIdToken();
-  if (!token) return signOut(copy.sessionEnded);
+  await run(async () => loadFamilyManagement(client().requireIdToken()));
+}
+
+async function submitChild(): Promise<void> {
+  const input = await validatedChildInput();
+  if (!input) return;
+  await run(async () => provisionChild(input));
+}
+
+async function validatedChildInput(): Promise<ChildFormInput | null> {
+  fieldError.value = {};
+  const username = normalizeUsernameForCognito(childUsername.value);
+  const displayName = childDisplayName.value.trim();
+  if (!isValidUsername(username)) fieldError.value.username = copy.usernamePolicyError;
+  if (!displayName) fieldError.value.displayName = profileCopy.displayNameRequired;
+  if (!childColor.value) fieldError.value.color = profileCopy.colorRequired;
+  if (!meetsAccountPasswordPolicy(childPassword.value))
+    fieldError.value.password = copy.passwordPolicyError;
+  if (Object.keys(fieldError.value).length) {
+    await showChildValidationFailure();
+    return null;
+  }
+  return {
+    username,
+    displayName,
+    color: childColor.value as ProfileColorId,
+    password: childPassword.value,
+  };
+}
+
+async function showChildValidationFailure(): Promise<void> {
+  status.value = copy.passwordPolicyError;
+  statusIsError.value = true;
+  await nextTick();
+  if (fieldError.value.username) childUsernameField.value?.focus();
+  else if (fieldError.value.password) childPasswordField.value?.focus();
+}
+
+async function provisionChild(input: ChildFormInput): Promise<void> {
+  const token = client().requireIdToken();
+  const result = await createChild(token, { ...input, idempotencyKey: childIdempotencyKey });
+  childPassword.value = '';
+  if (result.kind === 'error') {
+    await showChildProvisioningError(result);
+    return;
+  }
+  status.value = familyCopy.childCreated;
+  statusIsError.value = false;
+  clearChildForm();
   await loadFamilyManagement(token);
+}
+
+async function showChildProvisioningError(
+  result: Extract<CreateChildResult, { kind: 'error' }>,
+): Promise<void> {
+  for (const error of result.fieldErrors ?? []) fieldError.value[error.field] = error.message;
+  childProvisioningBlocked.value = !result.recoverable;
+  status.value = result.recoverable ? result.message : familyCopy.provisioningUnavailable;
+  statusIsError.value = true;
+  if (fieldError.value.username) {
+    await nextTick();
+    childUsernameField.value?.focus();
+  }
 }
 
 function cancelProfileEdit(): void {
   fieldError.value = {};
+}
+
+function clearChildForm(): void {
+  childUsername.value = '';
+  childDisplayName.value = '';
+  childColor.value = '';
+  childPassword.value = '';
+  childProvisioningBlocked.value = false;
 }
 
 function signOut(message = copy.signedOut): void {
@@ -391,6 +485,7 @@ function clearPrivateState(message: string): void {
   profile.value = null;
   clearProfileTone();
   familyMembers.value = [];
+  clearChildForm();
   username.value = '';
   email.value = '';
   fieldError.value = {};
@@ -407,6 +502,7 @@ function chooseScreen(next: Extract<BootstrapPageScreen, 'signin' | 'register' |
   gatePassword.value = '';
   code.value = '';
   newPassword.value = '';
+  clearChildForm();
   void navigate(routeByAuthScreen[next]);
 }
 
@@ -429,7 +525,11 @@ async function run(action: () => Promise<void>): Promise<void> {
   statusIsError.value = false;
   try {
     await action();
-  } catch {
+  } catch (error) {
+    if (error instanceof AuthSessionUnavailableError) {
+      signOut(copy.sessionEnded);
+      return;
+    }
     status.value = messages.generic.unexpectedError;
     statusIsError.value = true;
   } finally {
@@ -820,12 +920,111 @@ async function focusRouteHeading(): Promise<void> {
       <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>
     </div>
 
+    <form v-else-if="screen === 'child-create'" class="space-y-5" @submit.prevent="submitChild">
+      <h2 class="page-heading text-xl">{{ familyCopy.createChild }}</h2>
+      <p class="body-muted text-sm">{{ familyCopy.createChildHelp }}</p>
+      <label class="block"
+        >{{ copy.username
+        }}<input
+          ref="childUsernameField"
+          v-model="childUsername"
+          required
+          minlength="3"
+          maxlength="24"
+          autocomplete="username"
+          class="field"
+          :disabled="busy || childProvisioningBlocked"
+          :aria-invalid="!!fieldError.username"
+          aria-describedby="child-username-error"
+        /><span id="child-username-error" class="error">{{ fieldError.username }}</span></label
+      >
+      <label class="block"
+        >{{ familyCopy.childDisplayName
+        }}<input
+          v-model="childDisplayName"
+          required
+          maxlength="60"
+          autocomplete="nickname"
+          class="field"
+          :disabled="busy || childProvisioningBlocked"
+          :aria-invalid="!!fieldError.displayName"
+        /><span class="error">{{ fieldError.displayName }}</span></label
+      >
+      <div class="profile-color-preview" :data-profile-color="childColor || undefined">
+        <fieldset class="profile-color-preview__fieldset">
+          <legend class="body-strong font-medium">{{ profileCopy.color }}</legend>
+          <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <label
+              v-for="color in profileColors"
+              :key="color.id"
+              class="profile-color-option"
+              :class="{ 'profile-color-option--selected': childColor === color.id }"
+            >
+              <input
+                v-model="childColor"
+                type="radio"
+                name="child-profile-color"
+                :value="color.id"
+                :disabled="busy || childProvisioningBlocked"
+              />
+              <span
+                class="profile-color-swatch"
+                :style="{ backgroundColor: color.hex }"
+                aria-hidden="true"
+              />
+              <span class="profile-color-option__label">{{ color.label }}</span>
+            </label>
+          </div>
+          <span class="error">{{ fieldError.color }}</span>
+        </fieldset>
+      </div>
+      <label class="block"
+        >{{ familyCopy.childPassword
+        }}<input
+          ref="childPasswordField"
+          v-model="childPassword"
+          required
+          type="password"
+          autocomplete="new-password"
+          class="field"
+          :disabled="busy || childProvisioningBlocked"
+          :aria-invalid="!!fieldError.password"
+          aria-describedby="child-password-policy child-password-error"
+      /></label>
+      <span id="child-password-policy" class="body-muted -mt-3 block text-sm">{{
+        copy.passwordPolicy
+      }}</span>
+      <span id="child-password-error" class="error">{{ fieldError.password }}</span>
+      <div class="form-actions">
+        <button class="primary" type="submit" :disabled="busy || childProvisioningBlocked">
+          {{ busy ? familyCopy.creatingChild : familyCopy.createChildAction }}
+        </button>
+        <RouterLink
+          :to="{ name: AppRouteName.family }"
+          class="link inline-flex items-center"
+          :aria-disabled="busy"
+          :tabindex="busy ? -1 : undefined"
+          @click="busy ? $event.preventDefault() : clearChildForm()"
+        >
+          {{ familyCopy.cancel }}
+        </RouterLink>
+      </div>
+    </form>
+
     <div v-else-if="screen === 'family-management' && membership" class="family-page">
       <div class="family-page__heading">
         <div>
           <p class="meta-label text-sm">{{ copy.ready }}</p>
           <h2 class="page-heading text-2xl">{{ familyCopy.heading }}</h2>
           <p class="body-muted mt-1 text-sm">{{ membership.household.name }}</p>
+        </div>
+        <div class="family-page__actions">
+          <RouterLink :to="{ name: AppRouteName.newChild }" class="primary family-page__create">
+            {{ familyCopy.createChild }}
+          </RouterLink>
+          <button type="button" class="link family-page__sign-out" @click="signOut()">
+            {{ copy.signOut }}
+          </button>
         </div>
       </div>
       <p v-if="familyMembers.length === 0" class="body-secondary">{{ familyCopy.empty }}</p>
@@ -859,7 +1058,6 @@ async function focusRouteHeading(): Promise<void> {
           </RouterLink>
         </li>
       </ul>
-      <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>
     </div>
   </section>
 </template>

@@ -64,6 +64,7 @@ export const HouseholdErrorCode = {
   invalidTimezone: 'INVALID_TIMEZONE',
   invalidIdempotencyKey: 'INVALID_IDEMPOTENCY_KEY',
   invalidUsername: 'INVALID_USERNAME',
+  usernameConflict: 'USERNAME_CONFLICT',
   invalidDisplayName: 'INVALID_DISPLAY_NAME',
   invalidProfileColor: 'INVALID_PROFILE_COLOR',
   profileConflict: 'PROFILE_CONFLICT',

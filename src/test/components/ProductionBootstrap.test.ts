@@ -10,11 +10,14 @@ const resendConfirmationCode = vi.fn();
 const forgotPassword = vi.fn();
 const confirmForgotPassword = vi.fn();
 const getIdToken = vi.fn();
+const requireIdToken = vi.fn();
+class AuthSessionUnavailableError extends Error {}
 const fetchCurrentMembership = vi.fn();
 const createHousehold = vi.fn();
 const fetchMyProfile = vi.fn();
 const saveMyProfile = vi.fn();
 const fetchFamilyMembers = vi.fn();
+const createChild = vi.fn();
 
 vi.mock('../../config/authConfig', () => ({
   loadAuthConfig: () => ({
@@ -25,6 +28,7 @@ vi.mock('../../config/authConfig', () => ({
   }),
 }));
 vi.mock('../../services/authClient', () => ({
+  AuthSessionUnavailableError,
   AuthClient: class {
     restoreSession = restoreSession;
     signIn = signIn;
@@ -35,6 +39,7 @@ vi.mock('../../services/authClient', () => ({
     forgotPassword = forgotPassword;
     confirmForgotPassword = confirmForgotPassword;
     getIdToken = getIdToken;
+    requireIdToken = requireIdToken;
   },
 }));
 vi.mock('../../services/householdClient', () => ({ fetchCurrentMembership, createHousehold }));
@@ -44,7 +49,7 @@ vi.mock('../../services/profileClient', () => ({
   ProfileColor: { pine: 'PINE', lake: 'LAKE' },
   ProfileColorHex: { PINE: '#2F6B4F', LAKE: '#337B8C' },
 }));
-vi.mock('../../services/familyClient', () => ({ fetchFamilyMembers }));
+vi.mock('../../services/familyClient', () => ({ fetchFamilyMembers, createChild }));
 
 const { default: ProductionBootstrap } = await import('../../components/ProductionBootstrap.vue');
 const { router } = await import('../../router');
@@ -70,8 +75,24 @@ describe('ProductionBootstrap', () => {
     restoreSession.mockResolvedValue(null);
     fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership: null } });
     fetchMyProfile.mockResolvedValue({ kind: 'success', data: { profile: null } });
-    fetchFamilyMembers.mockResolvedValue({ kind: 'success', data: { members: [] } });
+    fetchFamilyMembers.mockResolvedValue({
+      kind: 'success',
+      data: {
+        members: [
+          {
+            memberId: 'member-one',
+            username: 'parent-one',
+            role: 'parent',
+            activationState: 'ACTIVE',
+            displayName: 'River',
+            color: 'PINE',
+            allowedActions: [],
+          },
+        ],
+      },
+    });
     getIdToken.mockReturnValue('id-token');
+    requireIdToken.mockReturnValue('id-token');
     await router.push({ name: AppRouteName.signIn });
   });
 
@@ -181,6 +202,55 @@ describe('ProductionBootstrap', () => {
     expect(document.activeElement).toBe(passwordField.element);
     expect(registerFirstParent).not.toHaveBeenCalled();
     wrapper.unmount();
+  });
+
+  it('creates a child from the canonical parent route and clears its password after submission', async () => {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership } });
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'member-one', displayName: 'River', color: 'PINE', version: 1 },
+      },
+    });
+    createChild.mockResolvedValue({
+      kind: 'success',
+      data: {
+        member: {
+          memberId: 'child-one',
+          username: 'child-one',
+          displayName: 'Child One',
+          role: 'child',
+          activationState: 'ACTIVE',
+          color: 'PINE',
+          allowedActions: [],
+        },
+      },
+    });
+    await router.push({ name: AppRouteName.newChild });
+    const wrapper = mountBootstrap();
+    await flushPromises();
+
+    expect(wrapper.get('h2').text()).toBe('Create child account');
+    await wrapper.get('input[autocomplete="username"]').setValue('Child-One');
+    await wrapper.get('input[autocomplete="nickname"]').setValue('Child One');
+    await wrapper.get('input[type="radio"]').setValue('PINE');
+    const passwordField = wrapper.get('input[autocomplete="new-password"]');
+    await passwordField.setValue('PrivatePassword1!');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(createChild).toHaveBeenCalledWith(
+      'id-token',
+      expect.objectContaining({
+        username: 'child-one',
+        displayName: 'Child One',
+        color: 'PINE',
+        password: 'PrivatePassword1!',
+      }),
+    );
+    expect(wrapper.find('input[autocomplete="new-password"]').exists()).toBe(false);
+    expect(router.currentRoute.value.name).toBe(AppRouteName.family);
   });
 
   it('offers generic Forgot Password initiation and completes recovery', async () => {
@@ -362,6 +432,44 @@ describe('ProductionBootstrap', () => {
       version: 1,
     });
     expect(wrapper.text()).toContain('Profile updated.');
+  });
+
+  it('keeps family actions beside the household heading rather than after the directory', async () => {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership } });
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'member-one', displayName: 'River', color: 'PINE', version: 1 },
+      },
+    });
+    fetchFamilyMembers.mockResolvedValue({
+      kind: 'success',
+      data: {
+        members: [
+          {
+            memberId: 'member-one',
+            username: 'parent-one',
+            role: 'parent',
+            activationState: 'ACTIVE',
+            displayName: 'River',
+            color: 'PINE',
+            allowedActions: [],
+          },
+        ],
+      },
+    });
+    const wrapper = mountBootstrap();
+    await flushPromises();
+
+    const actions = wrapper.get('.family-page__heading .family-page__actions');
+    expect(actions.get('a').text()).toBe('Create child account');
+    expect(actions.get('button').text()).toBe('Sign out');
+    expect(
+      wrapper
+        .find('.family-page__heading')
+        .element.compareDocumentPosition(wrapper.find('.family-directory').element),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('offers the runtime IANA timezone list instead of a curated subset', async () => {

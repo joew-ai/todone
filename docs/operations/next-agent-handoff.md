@@ -1,12 +1,12 @@
-# Next-agent handoff: Cognito administration and IAM foundation
+# Next-agent handoff: child provisioning UI
 
 ## Goal of the next changeset
 
-The identity-administration foundation is complete: `manage-family-accounts` tasks 2.2–2.3 add the typed Cognito adapter and a separate pool-scoped family-account Lambda role. No provisioning endpoint calls the adapter yet.
+Child provisioning is complete through the parent UI: tasks 4.1–4.2 add the protected endpoint, isolated Cognito-administration Lambda, and canonical `/family/children/new` form with shared accessible password guidance.
 
-The next infrastructure slice is tasks 2.4–2.5: configure Cognito's static welcome template, built-in sender, retained verified-email behavior, and browser app-client attribute restrictions. After that, implement one provisioning vertical slice using the adapter only after application authorization.
+The next slice is task 4.3: parent-managed child password reset and credential cutoff.
 
-Do not deploy or apply the reviewed IAM plan. No SES configuration, custom-message Lambda, member provisioning endpoint, or product UI was added by tasks 2.2–2.3.
+Do not deploy or apply. No SES configuration, custom-message Lambda, or production artifact publish occurred.
 
 ## Current state
 
@@ -23,6 +23,8 @@ Completed `manage-family-accounts` work:
 - 3.1–3.3: self-only Profiles and the household-safe family directory.
 - 3.4: canonical `vue-router` navigation and the child `/todos` placeholder.
 - 3.5–3.6: accepted family-account HTML reference and responsive family/profile implementation.
+- 4.1: parent-authorized child provisioning handler, pre-Cognito replay check, immutable child Membership/Profile transaction, permanent password setup, `409 USERNAME_CONFLICT`, and generic request-ID failure handling. The Terraform route uses the separate family-account role.
+- 4.2: parent-only child-creation route and typed client. Password input is immediate-only, cleared after submission/navigation, excluded from URLs, and governed by the shared accessible account-password guidance. Local Cognito administration requires the explicit `TODONE_LOCAL_DEVELOPMENT=true` flag and a loopback-only `COGNITO_LOCAL_ENDPOINT`; production always uses AWS Cognito.
 - 7.0: approved local command families.
 
 Tasks 1.2–1.6 are complete. The implementation uses a typed fail-closed resolution across DynamoDB and the in-memory test repository; unit and integration tests cover active, pending, inactive, stale-cutoff, malformed, and mismatched records as well as parent/child/cross-household target rules.
@@ -61,7 +63,9 @@ The separate `establish-visual-design-foundation` change has implementation task
 
 ## Remaining work
 
-Tasks 2.4–2.5 are complete. They configure the source-controlled static invitation template, built-in delivery, retained verified-email behavior, and two-client browser-write boundary. Terraform was initialized and validated at `family-paas` commit `beb37ef0e19d896984cb3c16165b2307e38fdf31`; its non-applying plan saved `/tmp/todone-cognito-clients.tfplan` updates the pool and existing PWA client in place and creates only the registration client. No SES custom sender is planned. The first application vertical slice can now follow.
+Tasks 2.4–2.5 are complete and were applied/tested by the human release owner. Tasks 4.1–4.2 are implemented but not deployed: the `create-child` artifact and API route require a future release owner to publish the recorded artifact and review a Terraform plan before any apply. No SES custom sender is planned. The private release record, outside this repository, owns applied-plan identifiers, published artifact hashes, and human test evidence.
+
+For tasks 4.1–4.2, formatting, lint, typecheck, 189 unit tests, 25 integration tests, production build, Lambda build, OpenSpec validation, Terraform format/validate, and `git diff --check` passed. The Playwright and accessibility suites were started but their configured `localhost:3000` was occupied by an unrelated Jort prototype, so those browser results are not valid evidence for Todone. Do not stop or alter that unrelated process; rerun the suites once port 3000 serves Todone.
 
 Task 2.5 has one external dependency: the pinned `family-paas` app-client module must expose an
 explicit non-empty `write_attributes` input. Cognito treats `[]` as omission/default permissions;
@@ -75,9 +79,8 @@ pre-apply evidence.
 
 ## Suggested file-level plan
 
-1. Implement and validate tasks 2.4–2.5 without apply.
-2. Choose one complete child or pending-parent provisioning flow and wire authorization before adapter access.
-3. Assign only privileged family-account mutation Lambdas to `family_account_admin_role_arn`; ordinary Lambdas retain the non-Cognito runtime role.
+1. Implement task 4.3's same-household child reset and credential cutoff.
+2. Keep only privileged family-account mutation Lambdas on `family_account_admin_role_arn`; ordinary Lambdas retain the non-Cognito runtime role.
 
 Prefer a small explicit API such as “resolve active membership,” “require active parent,” and operation-specific same-household target predicates over a generic policy engine. Keep authorization control flow explicit; do not encode security decisions in terse conditional expressions.
 

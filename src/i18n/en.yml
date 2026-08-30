@@ -93,6 +93,7 @@
       'accessUnavailable': 'This account cannot access household information.',
       'reauthenticationRequired': 'Your session needs to be refreshed. Sign in again.',
       'internalError': 'We could not complete this request. Try again later.',
+      'usernameConflict': 'That username is already in use.',
     },
   'cognitoAdministration':
     {
@@ -150,5 +151,13 @@
       'profileSaved': 'Profile updated.',
       'cancel': 'Cancel',
       'pendingActions': 'Pending parent actions will be available after account delivery is implemented.',
+      'createChild': 'Create child account',
+      'createChildHelp': 'Create a username and password your child can use to sign in right away.',
+      'childDisplayName': 'Child display name',
+      'childPassword': 'Child password',
+      'createChildAction': 'Create child account',
+      'creatingChild': 'Creating child account…',
+      'childCreated': 'Child account created.',
+      'provisioningUnavailable': 'We could not confirm this child account. Do not try this username again right now.',
     },
 }

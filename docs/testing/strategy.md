@@ -61,6 +61,8 @@ Open `http://localhost:3001`, enter the local development account, and confirm t
 
 `cognito-local` also does not provide evidence that AWS Cognito persists or enforces the production app-client `WriteAttributes` restrictions. The local two-client arrangement exercises correct application routing only; the reviewed AWS disposable probe and the pre-apply Terraform plan own enforcement evidence for the immutable browser-write guard and registration-only client.
 
+The local API simulator also exposes `POST /api/v1/family-members/children` and directs its administrative Cognito calls to `cognito-local` only when setup writes both `TODONE_LOCAL_DEVELOPMENT=true` and a loopback `COGNITO_LOCAL_ENDPOINT`. After creating a local parent household and profile, developers can use `/family/children/new` to exercise the child form. This confirms local request wiring only; the emulator does not prove AWS Cognito's production authorization, app-client permissions, or partial-failure behavior.
+
 To reset local identities, stop the emulator, delete `.cognito/db/`, delete `.env.local`, and repeat the bootstrap steps. This deletes synthetic local data only.
 
 ## Test layers

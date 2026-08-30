@@ -21,6 +21,7 @@ import {
 } from './constants';
 import {
   bootstrapReplayKey,
+  childProvisionReplayKey,
   householdKey,
   householdMemberKey,
   inMemoryReplayKey,
@@ -31,6 +32,8 @@ import {
 import type {
   BootstrapInput,
   BootstrapResult,
+  ProvisionChildInput,
+  ProvisionChildResult,
   CurrentMembership,
   FamilyDirectoryMember,
   Household,
@@ -180,6 +183,93 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
     return sortDirectoryMembers(members);
   }
 
+  async findChildProvisionReplay(
+    input: Omit<ProvisionChildInput, 'childSub'>,
+  ): Promise<ProvisionChildResult | null> {
+    const replay = await this.getItem(
+      childProvisionReplayKey(input.callerSub, input.idempotencyKey),
+    );
+    if (!replay) return null;
+    const inputHash = hashInput(input.username, input.displayName, input.color);
+    if (requiredStringAttribute(replay.inputHash) !== inputHash)
+      return { kind: 'idempotency-conflict' };
+    const memberId = requiredStringAttribute(replay.memberId);
+    const membership = await this.getItem(householdMemberKey(input.householdId, memberId));
+    const profile = await this.getProfile(input.householdId, memberId);
+    if (!membership || !profile) throw new Error('Child provisioning replay is inconsistent.');
+    return { kind: 'replayed', member: directoryMemberFromStoredItem(membership, profile) };
+  }
+
+  async provisionChild(input: ProvisionChildInput): Promise<ProvisionChildResult> {
+    const inputHash = hashInput(input.username, input.displayName, input.color);
+    const existing = await this.findChildProvisionReplay(input);
+    if (existing) return existing;
+    const memberId = this.id();
+    const createdAt = this.now().toISOString();
+    const member: Membership = {
+      householdId: input.householdId,
+      memberId,
+      sub: input.childSub,
+      username: input.username,
+      role: HouseholdRole.child,
+      activationState: MembershipActivationState.active,
+      createdAt,
+    };
+    const profile: Profile = {
+      memberId,
+      displayName: input.displayName,
+      color: input.color,
+      version: INITIAL_PROFILE_VERSION,
+    };
+    try {
+      await this.client.send(
+        new TransactWriteItemsCommand({
+          TransactItems: [
+            putItem(
+              this.tableName,
+              membershipLookupItem(
+                input.childSub,
+                input.username,
+                input.householdId,
+                memberId,
+                createdAt,
+                HouseholdRole.child,
+              ),
+              ATTRIBUTE_DOES_NOT_EXIST,
+            ),
+            putItem(
+              this.tableName,
+              householdMemberItem(
+                input.householdId,
+                memberId,
+                input.childSub,
+                input.username,
+                createdAt,
+                HouseholdRole.child,
+              ),
+            ),
+            putItem(
+              this.tableName,
+              profileItem(input.householdId, profile),
+              ATTRIBUTE_DOES_NOT_EXIST,
+            ),
+            putItem(
+              this.tableName,
+              childReplayItem(input.callerSub, input.idempotencyKey, inputHash, memberId),
+              ATTRIBUTE_DOES_NOT_EXIST,
+            ),
+          ],
+        }),
+      );
+      return { kind: 'created', member: directoryMemberFromMembership(member, profile) };
+    } catch (error) {
+      if (!(error instanceof TransactionCanceledException)) throw error;
+      const replay = await this.findChildProvisionReplay(input);
+      if (replay) return replay;
+      throw error;
+    }
+  }
+
   private async readReplay(
     sub: string,
     idempotencyKey: string,
@@ -210,6 +300,7 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
   private readonly memberships = new Map<string, Membership>();
   private readonly replays = new Map<string, { hash: string; membership: CurrentMembership }>();
   private readonly profiles = new Map<string, Profile>();
+  private readonly childReplays = new Map<string, { hash: string; memberId: string }>();
   constructor(private readonly id = randomUUID) {}
 
   async resolveMembership(sub: string, tokenIssuedAt?: number): Promise<MembershipResolution> {
@@ -312,6 +403,56 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
     });
     return sortDirectoryMembers(directory);
   }
+
+  async findChildProvisionReplay(
+    input: Omit<ProvisionChildInput, 'childSub'>,
+  ): Promise<ProvisionChildResult | null> {
+    const replayKey = inMemoryReplayKey(input.callerSub, `CHILD:${input.idempotencyKey}`);
+    const replay = this.childReplays.get(replayKey);
+    if (!replay) return null;
+    const hash = hashInput(input.username, input.displayName, input.color);
+    if (replay.hash !== hash) return { kind: 'idempotency-conflict' };
+    const member = this.memberships.get(membershipStorageKey(input.householdId, replay.memberId));
+    const profile = this.profiles.get(profileStorageKey(input.householdId, replay.memberId));
+    if (!member || !profile) throw new Error('Child provisioning replay is inconsistent.');
+    return { kind: 'replayed', member: directoryMemberFromMembership(member, profile) };
+  }
+
+  async provisionChild(input: ProvisionChildInput): Promise<ProvisionChildResult> {
+    const replayKey = inMemoryReplayKey(input.callerSub, `CHILD:${input.idempotencyKey}`);
+    const hash = hashInput(input.username, input.displayName, input.color);
+    const replay = await this.findChildProvisionReplay(input);
+    if (replay) return replay;
+    const memberId = this.id();
+    const createdAt = new Date(0).toISOString();
+    const member: Membership = {
+      householdId: input.householdId,
+      memberId,
+      sub: input.childSub,
+      username: input.username,
+      role: HouseholdRole.child,
+      activationState: MembershipActivationState.active,
+      createdAt,
+    };
+    const profile: Profile = {
+      memberId,
+      displayName: input.displayName,
+      color: input.color,
+      version: INITIAL_PROFILE_VERSION,
+    };
+    this.lookups.set(input.childSub, {
+      householdId: input.householdId,
+      memberId,
+      username: input.username,
+      role: HouseholdRole.child,
+      activationState: MembershipActivationState.active,
+      createdAt,
+    });
+    this.memberships.set(membershipStorageKey(input.householdId, memberId), member);
+    this.profiles.set(profileStorageKey(input.householdId, memberId), profile);
+    this.childReplays.set(replayKey, { hash, memberId });
+    return { kind: 'created', member: directoryMemberFromMembership(member, profile) };
+  }
 }
 
 function currentMembership(input: {
@@ -335,6 +476,7 @@ function membershipLookupItem(
   householdId: string,
   memberId: string,
   createdAt: string,
+  role: MembershipRole = HouseholdRole.parent,
 ) {
   const key = membershipLookupKey(sub);
   return {
@@ -343,7 +485,7 @@ function membershipLookupItem(
     householdId: stringAttribute(householdId),
     memberId: stringAttribute(memberId),
     username: stringAttribute(username),
-    role: stringAttribute(HouseholdRole.parent),
+    role: stringAttribute(role),
     activationState: stringAttribute(MembershipActivationState.active),
     createdAt: stringAttribute(createdAt),
   };
@@ -369,6 +511,7 @@ function householdMemberItem(
   sub: string,
   username: string,
   createdAt: string,
+  role: MembershipRole = HouseholdRole.parent,
 ) {
   const key = householdMemberKey(householdId, memberId);
   return {
@@ -377,7 +520,7 @@ function householdMemberItem(
     memberId: stringAttribute(memberId),
     sub: stringAttribute(sub),
     username: stringAttribute(username),
-    role: stringAttribute(HouseholdRole.parent),
+    role: stringAttribute(role),
     activationState: stringAttribute(MembershipActivationState.active),
     createdAt: stringAttribute(createdAt),
   };
@@ -411,6 +554,28 @@ function profileItem(householdId: string, profile: Profile) {
     displayName: stringAttribute(profile.displayName),
     color: stringAttribute(profile.color),
     version: numberAttribute(profile.version),
+  };
+}
+function childReplayItem(sub: string, idempotencyKey: string, inputHash: string, memberId: string) {
+  const key = childProvisionReplayKey(sub, idempotencyKey);
+  return {
+    pk: stringAttribute(key.pk),
+    sk: stringAttribute(key.sk),
+    inputHash: stringAttribute(inputHash),
+    memberId: stringAttribute(memberId),
+  };
+}
+function directoryMemberFromMembership(
+  membership: Membership,
+  profile: Profile,
+): FamilyDirectoryMember {
+  return {
+    memberId: membership.memberId,
+    username: membership.username,
+    role: membership.role,
+    activationState: membership.activationState,
+    displayName: profile.displayName,
+    color: profile.color,
   };
 }
 

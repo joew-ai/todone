@@ -212,6 +212,7 @@ function writeLocalEnv(values: {
     COGNITO_USER_POOL_ID: values.userPoolId,
     COGNITO_CLIENT_ID: values.clientId,
     COGNITO_LOCAL_ENDPOINT: LOCAL_ENDPOINT,
+    TODONE_LOCAL_DEVELOPMENT: 'true',
   };
 
   const seen = new Set<string>();

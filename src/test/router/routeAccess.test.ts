@@ -65,6 +65,24 @@ describe('route access', () => {
     expect(router.currentRoute.value.fullPath).toBe('/todos');
   });
 
+  it('keeps child-account creation parent-only at the route boundary', async () => {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    fetchCurrentMembership.mockResolvedValue({
+      kind: 'success',
+      data: { membership: childMembership },
+    });
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'child-member', displayName: 'Moss', color: 'MOSS', version: 1 },
+      },
+    });
+
+    await router.push({ name: AppRouteName.newChild });
+
+    expect(router.currentRoute.value.name).toBe(AppRouteName.todos);
+  });
+
   it('keeps verification identity and code out of the route', async () => {
     await router.push({ name: AppRouteName.verifyEmail });
 

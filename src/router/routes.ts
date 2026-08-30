@@ -29,7 +29,8 @@ export type BootstrapPageScreen =
   | 'household'
   | 'profile-setup'
   | 'family-management'
-  | 'profile-edit';
+  | 'profile-edit'
+  | 'child-create';
 
 type AppRouteDefinition = {
   name: AppRouteName;
@@ -137,8 +138,7 @@ export const appRouteDefinitions: Record<AppRouteName, AppRouteDefinition> = {
     name: AppRouteName.newChild,
     path: '/family/children/new',
     title: messages.navigation.newChildTitle,
-    bootstrapScreen: null,
-    unavailable: true,
+    bootstrapScreen: 'child-create',
   },
   [AppRouteName.newParent]: {
     name: AppRouteName.newParent,

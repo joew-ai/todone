@@ -343,6 +343,27 @@ module "lambdas" {
   }
 }
 
+# This handler is intentionally separate from ordinary API Lambdas: it is the
+# first deployed caller of Cognito's reviewed family-account administration
+# permissions, after its own active-parent authorization check.
+module "create_child_lambda" {
+  source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/lambda-function?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
+
+  function_name    = "create-child"
+  app_name         = local.app_name
+  environment      = local.environment
+  lambda_role_arn  = aws_iam_role.family_account_admin_role.arn
+  s3_bucket        = data.terraform_remote_state.shared.outputs.lambda_deployments_bucket
+  s3_key           = var.lambda_artifacts["create-child"].s3_key
+  source_code_hash = var.lambda_artifacts["create-child"].source_code_hash
+
+  environment_variables = {
+    TODONE_TABLE_NAME    = module.table.table_name
+    COGNITO_USER_POOL_ID = aws_cognito_user_pool.todone.id
+    COGNITO_CLIENT_ID    = module.auth.client_id
+  }
+}
+
 module "api" {
   source = "git::https://github.com/josephwegner/family-paas.git//terraform/modules/api-gateway?ref=beb37ef0e19d896984cb3c16165b2307e38fdf31"
 
@@ -393,6 +414,12 @@ module "api" {
       route_key     = "GET /api/v1/family-members"
       function_arn  = module.lambdas["family-directory"].invoke_arn
       function_name = module.lambdas["family-directory"].function_name
+      auth_required = true
+    },
+    {
+      route_key     = "POST /api/v1/family-members/children"
+      function_arn  = module.create_child_lambda.invoke_arn
+      function_name = module.create_child_lambda.function_name
       auth_required = true
     },
   ]

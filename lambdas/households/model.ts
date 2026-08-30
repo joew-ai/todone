@@ -85,6 +85,20 @@ export interface SaveProfileInput {
   version: number;
 }
 
+export interface ProvisionChildInput {
+  callerSub: string;
+  householdId: string;
+  childSub: string;
+  username: string;
+  displayName: string;
+  color: ProfileColorId;
+  idempotencyKey: string;
+}
+
+export type ProvisionChildResult =
+  | { kind: 'created' | 'replayed'; member: FamilyDirectoryMember }
+  | { kind: 'idempotency-conflict' };
+
 export type SaveProfileResult =
   { kind: 'created' | 'updated'; profile: Profile } | { kind: 'conflict'; profile: Profile | null };
 
@@ -107,4 +121,9 @@ export interface HouseholdRepository {
   getProfile(householdId: string, memberId: string): Promise<Profile | null>;
   saveProfile(input: SaveProfileInput): Promise<SaveProfileResult>;
   listFamilyMembers(householdId: string): Promise<FamilyDirectoryMember[]>;
+  /** Checks a completed child-provisioning request before any Cognito side effect. */
+  findChildProvisionReplay(
+    input: Omit<ProvisionChildInput, 'childSub'>,
+  ): Promise<ProvisionChildResult | null>;
+  provisionChild(input: ProvisionChildInput): Promise<ProvisionChildResult>;
 }

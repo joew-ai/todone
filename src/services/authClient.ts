@@ -34,6 +34,11 @@ export type AuthActionResult =
       field?: 'username' | 'email' | 'registrationGatePassword' | 'code' | 'password';
     };
 
+/** Signals that an authenticated API action cannot safely proceed in this tab. */
+export class AuthSessionUnavailableError extends Error {
+  readonly name = 'AuthSessionUnavailableError';
+}
+
 /**
  * Thin, typed wrapper around amazon-cognito-identity-js using username/JWT
  * terminology throughout (never "email"), matching the replacement Cognito
@@ -225,6 +230,13 @@ export class AuthClient {
       return this.localSession.idToken;
     }
     return this.currentUser?.getSignInUserSession()?.getIdToken().getJwtToken() ?? null;
+  }
+
+  /** Returns a current token or makes the caller take the one shared session-ended path. */
+  requireIdToken(): string {
+    const token = this.getIdToken();
+    if (!token) throw new AuthSessionUnavailableError();
+    return token;
   }
 
   private async signInSrp(username: string, password: string): Promise<SignInResult> {

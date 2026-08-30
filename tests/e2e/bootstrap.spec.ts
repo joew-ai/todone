@@ -306,6 +306,50 @@ test('renders a readable active and pending family directory without invented ac
   await expect(directory.getByRole('button')).toHaveCount(0);
 });
 
+test('creates a child from the parent-only route without placing its password in the URL', async ({
+  page,
+}) => {
+  await mockProfileAndDirectory(page, existingProfile);
+  await page.route('**/api/v1/family-members/children', async (route) => {
+    expect(route.request().headers()['idempotency-key']).toBeTruthy();
+    expect(route.request().postDataJSON()).toEqual({
+      username: 'child-one',
+      displayName: 'Child One',
+      color: 'PINE',
+      password: 'ChildPassword1!',
+    });
+    await route.fulfill({
+      status: 201,
+      json: {
+        member: {
+          memberId: 'child-member',
+          username: 'child-one',
+          displayName: 'Child One',
+          role: 'child',
+          activationState: 'ACTIVE',
+          color: 'PINE',
+          allowedActions: [],
+        },
+      },
+    });
+  });
+  await signIn(page, () => membership);
+
+  await page.getByRole('link', { name: 'Create child account' }).click();
+  await expect(page).toHaveURL(/\/family\/children\/new$/);
+  await expect(
+    page.getByText('including an uppercase letter, lowercase letter, number, and symbol'),
+  ).toBeVisible();
+  await page.getByLabel('Username').fill('Child-One');
+  await page.getByLabel('Child display name').fill('Child One');
+  await page.getByLabel('Pine').check();
+  await page.getByLabel('Child password').fill('ChildPassword1!');
+  await page.getByRole('button', { name: 'Create child account', exact: true }).click();
+
+  await expect(page).toHaveURL(/\/family$/);
+  expect(page.url()).not.toContain('ChildPassword1!');
+});
+
 test('supports parent Forgot Password without account disclosure', async ({ page }) => {
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await page.getByLabel('Username').fill('UnknownOrParent');

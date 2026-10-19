@@ -5,6 +5,11 @@ import { loadAuthConfig } from '../config/authConfig';
 import { messages } from '../i18n/messages';
 import { applyMembershipContext } from '../presentation/appContext';
 import { applyProfileTone } from '../presentation/profileTone';
+import {
+  clearRouteBootstrapContext,
+  isCurrentRouteBootstrapResolution,
+  stageRouteBootstrapContext,
+} from '../presentation/routeBootstrapContext';
 import { AuthClient } from '../services/authClient';
 import { fetchCurrentMembership } from '../services/householdClient';
 import { fetchMyProfile } from '../services/profileClient';
@@ -40,6 +45,7 @@ router.afterEach((to) => {
 });
 
 async function resolveRouteAccess(to: RouteLocationNormalized) {
+  const resolutionVersion = clearRouteBootstrapContext();
   const routeName = to.name as AppRouteNameType;
   if (isUnavailableRouteName(routeName)) {
     return { name: AppRouteName.root, replace: true };
@@ -47,6 +53,7 @@ async function resolveRouteAccess(to: RouteLocationNormalized) {
 
   const authClient = new AuthClient(loadAuthConfig());
   const session = await authClient.restoreSession();
+  if (!isCurrentRouteBootstrapResolution(resolutionVersion)) return false;
   if (!session) {
     applyMembershipContext(null);
     if (isPublicRouteName(routeName)) return true;
@@ -54,6 +61,7 @@ async function resolveRouteAccess(to: RouteLocationNormalized) {
   }
 
   const membershipResult = await fetchCurrentMembership(session.idToken);
+  if (!isCurrentRouteBootstrapResolution(resolutionVersion)) return false;
   if (membershipResult.kind === 'error') {
     applyMembershipContext(null);
     if (membershipResult.recoverable) return true;
@@ -62,20 +70,25 @@ async function resolveRouteAccess(to: RouteLocationNormalized) {
   const membership = membershipResult.data.membership;
   applyMembershipContext(membership);
   if (!membership) {
-    return routeName === AppRouteName.householdSetup
-      ? true
-      : { name: AppRouteName.householdSetup, replace: true };
+    if (routeName === AppRouteName.householdSetup) {
+      stageRouteBootstrapContext({ routeName, authClient, membership, profile: null });
+      return true;
+    }
+    return { name: AppRouteName.householdSetup, replace: true };
   }
 
   const profileResult = await fetchMyProfile(session.idToken);
+  if (!isCurrentRouteBootstrapResolution(resolutionVersion)) return false;
   if (profileResult.kind === 'error') {
     if (profileResult.recoverable) return true;
     return { name: AppRouteName.signIn, replace: true };
   }
   if (!profileResult.data.profile) {
-    return routeName === AppRouteName.profileSetup
-      ? true
-      : { name: AppRouteName.profileSetup, replace: true };
+    if (routeName === AppRouteName.profileSetup) {
+      stageRouteBootstrapContext({ routeName, authClient, membership, profile: null });
+      return true;
+    }
+    return { name: AppRouteName.profileSetup, replace: true };
   }
   applyProfileTone(profileResult.data.profile.color);
 
@@ -92,5 +105,11 @@ async function resolveRouteAccess(to: RouteLocationNormalized) {
   ) {
     return { name: homeRoute, replace: true };
   }
+  stageRouteBootstrapContext({
+    routeName,
+    authClient,
+    membership,
+    profile: profileResult.data.profile,
+  });
   return true;
 }

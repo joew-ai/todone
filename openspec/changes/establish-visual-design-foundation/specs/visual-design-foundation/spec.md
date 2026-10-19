@@ -37,6 +37,20 @@ The signed-in application shell SHALL use canonical `/todos` as the child landin
 - **WHEN** an active parent uses any supported viewport after Todo creation is available
 - **THEN** a prominent labelled path to create and assign a Todo is available without navigating through account settings
 
+### Requirement: Accessible Local Sign-Out
+The child Todo landing surface SHALL expose a named, keyboard-accessible Sign out button. Sign-out SHALL clear local credentials and private presentation state and replace the route with sign-in even if SDK cleanup fails.
+
+#### Scenario: Child signs out
+- **WHEN** a signed-in child activates Sign out from `/todos`
+- **THEN** sign-in is shown, local credentials and profile/membership presentation are cleared, and Back or reload cannot restore a private page without authentication
+
+### Requirement: Stable Authenticated Navigation
+A page SHALL consume session, membership, and profile prerequisites already resolved by its current route guard without repeating a full-page session-restoration state. Every navigation SHALL retain current authorization checks. Guard results SHALL be handed off only in memory and cleared on sign-out or a new navigation.
+
+#### Scenario: Child moves between Todos and profile
+- **WHEN** a child navigates from `/todos` to `/profile` and returns using Back
+- **THEN** the destination heading receives focus without a repeated session-restoration screen, and each navigation still checks current membership and profile
+
 ### Requirement: Rewarding Server-Confirmed Completion Feedback
 Todo completion feedback SHALL begin its celebratory phase only after the server confirms success. The confirmed interaction SHALL provide a brief, local pop and one of a small reviewed family of equally prominent nature-inspired light/shape/motion treatments, resolve the row to an explicitly completed lower-emphasis appearance, and remove it from the active list within a few seconds. The client SHALL select the effect by hashing the stable Todo ID into the approved effect list so retry/reopen behavior is deterministic without persisted reward state. Selection SHALL NOT assign, communicate, collect, or reward rarity. Feedback SHALL NOT use sound, vibration, emoji, scores, streaks, or motion that blocks the next action. A visible labelled control SHALL remain available even if supplementary swipe completion is implemented.
 

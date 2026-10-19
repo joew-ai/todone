@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { activeMembershipRole } from '../../presentation/appContext';
+import { clearLocalAuthentication } from '../../services/localSignOut';
+import { takeRouteBootstrapContext } from '../../presentation/routeBootstrapContext';
 
 const restoreSession = vi.fn();
 const fetchCurrentMembership = vi.fn();
@@ -83,6 +86,57 @@ describe('route access', () => {
     expect(router.currentRoute.value.name).toBe(AppRouteName.todos);
     await router.push({ name: AppRouteName.resetChildPassword, params: { memberId: 'peer' } });
     expect(router.currentRoute.value.name).toBe(AppRouteName.todos);
+  });
+
+  it('rechecks membership on every navigation rather than trusting the previous handoff', async () => {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    fetchCurrentMembership.mockResolvedValue({
+      kind: 'success',
+      data: { membership: childMembership },
+    });
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'child-member', displayName: 'Moss', color: 'MOSS', version: 1 },
+      },
+    });
+    await router.push({ name: AppRouteName.todos });
+    expect(router.currentRoute.value.name).toBe(AppRouteName.todos);
+    fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership: null } });
+    await router.push({ name: AppRouteName.profile });
+    expect(router.currentRoute.value.name).toBe(AppRouteName.householdSetup);
+  });
+
+  it('does not restore private context when an earlier navigation finishes after sign-out', async () => {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    fetchCurrentMembership.mockResolvedValue({
+      kind: 'success',
+      data: { membership: childMembership },
+    });
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: { memberId: 'child-member', displayName: 'Moss', color: 'MOSS', version: 1 },
+      },
+    });
+    await router.push({ name: AppRouteName.todos });
+    fetchCurrentMembership.mockClear();
+    let finishMembership!: (value: unknown) => void;
+    fetchCurrentMembership.mockReturnValue(
+      new Promise((resolve) => {
+        finishMembership = resolve;
+      }),
+    );
+    const navigation = router.push({ name: AppRouteName.profile });
+    await vi.waitFor(() => expect(fetchCurrentMembership).toHaveBeenCalledOnce());
+    clearLocalAuthentication(null);
+    restoreSession.mockResolvedValue(null);
+    await router.push({ name: AppRouteName.signIn });
+    finishMembership({ kind: 'success', data: { membership: childMembership } });
+    await navigation;
+    expect(router.currentRoute.value.name).toBe(AppRouteName.signIn);
+    expect(activeMembershipRole.value).toBeNull();
+    expect(takeRouteBootstrapContext(AppRouteName.profile)).toBeNull();
   });
 
   it('keeps verification identity and code out of the route', async () => {

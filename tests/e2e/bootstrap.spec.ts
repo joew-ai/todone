@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route, type TestInfo } from '@playwright/test';
 
 const membership = {
   memberId: 'synthetic-member',
@@ -152,6 +152,49 @@ async function signIn(
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
+async function captureFoundationSurface(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+): Promise<void> {
+  const viewport = page.viewportSize()!;
+  await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
+  await page.setViewportSize({ width: 320, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.screenshot({ path: testInfo.outputPath(`${name}-320.png`), fullPage: true });
+  // Text enlargement is portable across engines; actual browser zoom still requires human review.
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+  await page.screenshot({ path: testInfo.outputPath(`${name}-text-200.png`), fullPage: true });
+  const overflowing = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('body *'))
+      .filter((element) => element.getBoundingClientRect().right > innerWidth + 1)
+      .map(
+        (element) =>
+          `${element.tagName}.${element.className}: ${element.getBoundingClientRect().right}`,
+      ),
+  );
+  expect(overflowing).toEqual([]);
+  const escapedColorLabels = await page
+    .locator('.profile-color-option__label')
+    .evaluateAll((labels) =>
+      labels
+        .filter((label) => {
+          const option = label.closest('label')!.getBoundingClientRect();
+          const text = document.createRange();
+          text.selectNodeContents(label);
+          return Array.from(text.getClientRects()).some((rect) => rect.right > option.right + 1);
+        })
+        .map((label) => label.textContent),
+    );
+  expect(escapedColorLabels).toEqual([]);
+  await page.evaluate(() => {
+    document.documentElement.style.removeProperty('font-size');
+  });
+  await page.setViewportSize(viewport);
+}
+
 test.beforeEach(async ({ page }) => {
   await mockCognito(page);
   await page.goto('/');
@@ -241,7 +284,7 @@ test('uncertain child reset failure clears the password and prevents a second su
 
 test('registers, verifies email, signs in, creates a household, and reaches onboarding', async ({
   page,
-}) => {
+}, testInfo) => {
   let currentMembership: typeof membership | null = null;
   await page.getByRole('button', { name: 'Create first-parent account' }).click();
   await page.getByLabel('Username').fill('ParentOne');
@@ -278,10 +321,12 @@ test('registers, verifies email, signs in, creates a household, and reaches onbo
   await mockProfileAndDirectory(page, null);
   await signIn(page, () => currentMembership);
   await expect(page.getByRole('heading', { name: 'Create your household' })).toBeVisible();
+  await captureFoundationSurface(page, testInfo, 'household-setup');
   await page.getByLabel('Household name').fill('River House');
   await page.getByLabel('Household timezone').selectOption('America/Chicago');
   await page.getByRole('button', { name: 'Create household' }).click();
   await expect(page.getByRole('heading', { name: 'Set up your profile' })).toBeVisible();
+  await captureFoundationSurface(page, testInfo, 'profile-setup');
   await page.getByLabel('Display name').fill('River');
   await page.getByLabel('Lake').check();
   await page.getByRole('button', { name: 'Continue to family management' }).click();
@@ -345,7 +390,7 @@ test('restores only the current tab from sessionStorage and completely clears si
 
 test('renders a readable active and pending family directory without invented actions', async ({
   page,
-}) => {
+}, testInfo) => {
   await mockProfileAndDirectory(page, existingProfile, [
     {
       memberId: membership.memberId,
@@ -386,6 +431,7 @@ test('renders a readable active and pending family directory without invented ac
   await expect(directory).toContainText('Morgan Vale');
   await expect(directory).toContainText('Pending activation');
   await expect(directory.getByRole('button')).toHaveCount(0);
+  await captureFoundationSurface(page, testInfo, 'family-long-content');
 });
 
 test('creates a child from the parent-only route without placing its password in the URL', async ({
@@ -504,7 +550,7 @@ test('keeps verification identity out of the URL while allowing direct route ent
 
 test('routes an active child to the Todo work-in-progress page without Todo traffic', async ({
   page,
-}) => {
+}, testInfo) => {
   let todoRequests = 0;
   await page.route('**/api/v1/todos**', async (route) => {
     todoRequests += 1;
@@ -534,14 +580,57 @@ test('routes an active child to the Todo work-in-progress page without Todo traf
   await expect(heading).toBeFocused();
   await expect(page).toHaveTitle('Todos · Todone');
   await expect(page.getByText('Work in progress')).toBeVisible();
+  await captureFoundationSurface(page, testInfo, 'child-todos');
   await expect(page.getByRole('button', { name: /complete|create/i })).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('My Todos');
   await expect(page.getByRole('navigation', { name: 'Application' })).toContainText('My profile');
   await expect(page.locator('html')).toHaveAttribute('data-profile-color', 'PINE');
-  await page.getByRole('link', { name: 'My profile' }).click();
+  await page.evaluate(() => {
+    const observed: string[] = [];
+    Object.assign(window, { foundationNavigationScreens: observed });
+    new MutationObserver(() => {
+      if (document.querySelector('main')?.textContent?.includes('Restoring your private session')) {
+        observed.push('restoring');
+      }
+    }).observe(document.querySelector('main')!, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
+  let profileReads = 0;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/v1/profiles/me') && request.method() === 'GET') profileReads++;
+  });
+  await page.getByRole('link', { name: 'My profile', exact: true }).click();
   await expect(page).toHaveURL(/\/profile$/);
-  await expect(page.getByRole('heading', { name: 'Edit my profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Edit my profile' })).toBeFocused();
+  expect(profileReads).toBe(1);
   await page.goBack();
   await expect(page).toHaveURL(/\/todos$/);
+  await expect(heading).toBeFocused();
+  expect(profileReads).toBe(2);
+  expect(await page.evaluate(() => Reflect.get(window, 'foundationNavigationScreens'))).toEqual([]);
   expect(todoRequests).toBe(0);
+  // Leave a protected page behind sign-in in history so Back exercises its guard.
+  await page.getByRole('link', { name: 'My profile', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Edit my profile' })).toBeFocused();
+  await page.getByRole('link', { name: 'My Todos', exact: true }).click();
+  await expect(heading).toBeFocused();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeFocused();
+  await expect(page.getByRole('navigation', { name: 'Application' })).toHaveCount(0);
+  await expect(page.locator('html')).not.toHaveAttribute('data-profile-color');
+  expect(
+    await page.evaluate(() =>
+      Object.keys(sessionStorage).filter(
+        (key) => key.startsWith('todone.auth.') || key.includes('CognitoIdentityServiceProvider'),
+      ),
+    ),
+  ).toEqual([]);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 });

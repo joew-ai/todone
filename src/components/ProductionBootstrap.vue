@@ -4,7 +4,9 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { loadAuthConfig } from '../config/authConfig';
 import { messages } from '../i18n/messages';
 import { applyMembershipContext } from '../presentation/appContext';
-import { applyProfileTone, clearProfileTone } from '../presentation/profileTone';
+import { applyProfileTone } from '../presentation/profileTone';
+import { takeRouteBootstrapContext } from '../presentation/routeBootstrapContext';
+import { clearLocalAuthentication } from '../services/localSignOut';
 import { meetsAccountPasswordPolicy } from '../services/accountPassword';
 import { isValidUsername, normalizeUsernameForCognito } from '../services/username';
 import {
@@ -62,6 +64,7 @@ const routeByAuthScreen = {
 
 const route = useRoute();
 const router = useRouter();
+const initialContext = takeRouteBootstrapContext(route.name as AppRouteNameType);
 
 const supportedTimezones = availableIanaTimezones();
 const copy = messages.bootstrap;
@@ -72,7 +75,9 @@ const profileColors = Object.values(ProfileColor).map((color) => ({
   hex: ProfileColorHex[color],
   label: color.charAt(0) + color.slice(1).toLowerCase(),
 }));
-const transientScreen = ref<TransientScreen | null>(DEFAULT_TRANSIENT_SCREEN);
+const transientScreen = ref<TransientScreen | null>(
+  initialContext ? null : DEFAULT_TRANSIENT_SCREEN,
+);
 const screen = computed<Screen>(() => {
   const routeName = route.name as AppRouteNameType;
   return transientScreen.value ?? bootstrapScreenForRoute(routeName) ?? DEFAULT_TRANSIENT_SCREEN;
@@ -88,10 +93,10 @@ const code = ref('');
 const newPassword = ref('');
 const householdName = ref('');
 const timezone = ref(browserTimezone());
-const membership = ref<CurrentMembership | null>(null);
-const displayName = ref('');
-const profileColor = ref<ProfileColorId | ''>('');
-const profile = ref<Profile | null>(null);
+const membership = ref<CurrentMembership | null>(initialContext?.membership ?? null);
+const displayName = ref(initialContext?.profile?.displayName ?? '');
+const profileColor = ref<ProfileColorId | ''>(initialContext?.profile?.color ?? '');
+const profile = ref<Profile | null>(initialContext?.profile ?? null);
 const familyMembers = ref<FamilyMember[]>([]);
 const childUsername = ref('');
 const childDisplayName = ref('');
@@ -117,7 +122,7 @@ const resetTarget = computed(() =>
 );
 let idempotencyKey = globalThis.crypto.randomUUID();
 let childIdempotencyKey = globalThis.crypto.randomUUID();
-let authClient: AuthClient | null = null;
+let authClient: AuthClient | null = initialContext?.authClient ?? null;
 
 watch([householdName, timezone], () => {
   idempotencyKey = globalThis.crypto.randomUUID();
@@ -158,6 +163,13 @@ watch(
 
 onMounted(async () => {
   try {
+    if (initialContext) {
+      if (initialContext.membership && initialContext.profile) {
+        await showResolvedProfile(client().requireIdToken());
+      }
+      await focusRouteHeading();
+      return;
+    }
     authClient = new AuthClient(loadAuthConfig());
     const session = await authClient.restoreSession();
     if (session) await resolveMembership(session.idToken);
@@ -288,6 +300,11 @@ async function resolveProfile(idToken: string): Promise<void> {
     await clearTransientScreenAndNavigate(AppRouteName.profileSetup);
     return;
   }
+  await showResolvedProfile(idToken);
+}
+
+async function showResolvedProfile(idToken: string): Promise<void> {
+  if (!profile.value) return;
   applyProfileTone(profile.value.color);
   if (membership.value?.role === 'child' && route.name !== AppRouteName.profile) {
     await clearTransientScreenAndNavigate(AppRouteName.todos);
@@ -542,13 +559,8 @@ function clearChildForm(): void {
 }
 
 function signOut(message = copy.signedOut): void {
-  // This app has no remote sign-out endpoint. Local private state must clear
-  // even if Cognito's local SDK cleanup unexpectedly throws.
-  try {
-    authClient?.signOut();
-  } finally {
-    clearPrivateState(message);
-  }
+  clearLocalAuthentication(authClient);
+  clearPrivateState(message);
 }
 
 function clearPrivateState(message: string): void {
@@ -562,7 +574,6 @@ function clearPrivateState(message: string): void {
   displayName.value = '';
   profileColor.value = '';
   profile.value = null;
-  clearProfileTone();
   familyMembers.value = [];
   clearChildForm();
   replacementChildPassword.value = '';
@@ -936,7 +947,7 @@ async function focusRouteHeading(): Promise<void> {
           :aria-describedby="fieldError.color ? 'profile-color-error' : undefined"
         >
           <legend class="body-strong font-medium">{{ profileCopy.color }}</legend>
-          <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div class="profile-color-options mt-2">
             <label
               v-for="color in profileColors"
               :key="color.id"
@@ -1075,7 +1086,7 @@ async function focusRouteHeading(): Promise<void> {
       <div class="profile-color-preview" :data-profile-color="childColor || undefined">
         <fieldset class="profile-color-preview__fieldset">
           <legend class="body-strong font-medium">{{ profileCopy.color }}</legend>
-          <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div class="profile-color-options mt-2">
             <label
               v-for="color in profileColors"
               :key="color.id"

@@ -118,3 +118,9 @@ This inventory records the implementation immediately before the visual foundati
 - Apply the foundation first to the app shell and existing authentication/household-bootstrap surfaces, preserving their tested flow and focus behavior.
 - Use the first family-management and Todo screens to validate density, role navigation, Todo anatomy, and completion motion before later lifecycle, label, and recurrence surfaces extend them.
 - Roll back individual visual primitives independently if they fail contrast, motion, or responsive review; no data migration is involved.
+
+## Production review corrections (2026-10-19)
+
+The owner accepted the existing aesthetics during real-app testing and requested a child sign-out control after finding none on `/todos`. Add a named secondary action to the existing Todo work-in-progress surface; this is a narrow correction, not a new page or a Todo action. Reuse fail-safe local sign-out cleanup, remove membership/profile presentation, and replace the route with sign-in even if SDK cleanup throws. No remote sign-out contract is introduced.
+
+The owner also reported repeated session-restoration screens during navigation. The route guard already restores authentication and fetches current membership/profile; a newly mounted bootstrap page repeats that work. Hand off the successful guard result to the destination component once, in memory, keyed by route name. Do not persist it, put it in browser history, or use it to skip the next guard's authorization checks. Clear it on a new navigation and sign-out. Initial restoration and recoverable-error paths remain honest; page-specific directory loading retains its own loading/error states. The current page stays visible while the next guard resolves.

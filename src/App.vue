@@ -20,7 +20,7 @@ const hasApplicationNavigation = computed(() => activeMembershipRole.value !== n
       </h1>
       <nav
         v-if="hasApplicationNavigation"
-        class="flex items-center gap-1 text-sm"
+        class="flex flex-wrap items-center gap-1 text-sm"
         aria-label="Application"
       >
         <RouterLink

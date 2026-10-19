@@ -21,6 +21,7 @@
       'profileTitle': 'Edit my profile',
       'securityTitle': 'Security settings',
       'newChildTitle': 'Create child account',
+      'resetChildPasswordTitle': 'Reset child password',
       'newParentTitle': 'Create parent account',
     },
   'bootstrap':
@@ -94,6 +95,10 @@
       'reauthenticationRequired': 'Your session needs to be refreshed. Sign in again.',
       'internalError': 'We could not complete this request. Try again later.',
       'usernameConflict': 'That username is already in use.',
+      'targetNotFound': 'That family member is not available.',
+      'targetNotManageable': 'That family member cannot be managed this way.',
+      'localPasswordResetUnavailable': 'Password reset is unavailable in local development. No password was changed.',
+      'invalidPassword': 'Choose a password with at least 8 characters, including an uppercase letter, lowercase letter, number, and symbol.',
     },
   'cognitoAdministration':
     {
@@ -159,5 +164,11 @@
       'creatingChild': 'Creating child account…',
       'childCreated': 'Child account created.',
       'provisioningUnavailable': 'We could not confirm this child account. Do not try this username again right now.',
+      'resetChildPassword': 'Reset child password',
+      'resetChildPasswordHelp': 'This signs the child out on every device. The password is not displayed after submission.',
+      'resetChildPasswordAction': 'Reset password',
+      'resettingChildPassword': 'Resetting password…',
+      'childPasswordReset': 'Child password reset. The child must sign in again.',
+      'resetUnavailable': 'We could not confirm this password reset. Do not submit it again right now.',
     },
 }

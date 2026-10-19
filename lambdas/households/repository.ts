@@ -4,6 +4,7 @@ import {
   GetItemCommand,
   QueryCommand,
   PutItemCommand,
+  UpdateItemCommand,
   TransactWriteItemsCommand,
   ConditionalCheckFailedException,
   TransactionCanceledException,
@@ -37,6 +38,7 @@ import type {
   CurrentMembership,
   FamilyDirectoryMember,
   Household,
+  HouseholdMemberTarget,
   HouseholdRepository,
   Membership,
   MembershipActivationState as MembershipActivationStateValue,
@@ -181,6 +183,49 @@ export class DynamoHouseholdRepository implements HouseholdRepository {
       }),
     );
     return sortDirectoryMembers(members);
+  }
+
+  async getHouseholdMemberTarget(
+    householdId: string,
+    memberId: string,
+  ): Promise<HouseholdMemberTarget | null> {
+    const item = await this.getItem(householdMemberKey(householdId, memberId));
+    if (!item) return null;
+    const target = householdMemberTargetFromItem(item);
+    const lookup = await this.getItem(membershipLookupKey(target.sub));
+    if (
+      !lookup ||
+      requiredStringAttribute(lookup.householdId) !== householdId ||
+      requiredStringAttribute(lookup.memberId) !== memberId ||
+      target.memberId !== memberId ||
+      requiredStringAttribute(lookup.username) !== target.username ||
+      requiredMembershipRole(lookup.role) !== target.role ||
+      requiredActivationState(lookup.activationState) !== target.activationState
+    )
+      throw new Error('Member target lookup is inconsistent.');
+    return target;
+  }
+
+  async advanceCredentialsValidAfter(sub: string, cutoff: string): Promise<void> {
+    const key = membershipLookupKey(sub);
+    try {
+      await this.client.send(
+        new UpdateItemCommand({
+          TableName: this.tableName,
+          Key: { pk: stringAttribute(key.pk), sk: stringAttribute(key.sk) },
+          UpdateExpression: 'SET #credentialsValidAfter = :cutoff',
+          ConditionExpression:
+            'attribute_exists(pk) AND (attribute_not_exists(#credentialsValidAfter) OR #credentialsValidAfter < :cutoff)',
+          ExpressionAttributeNames: { '#credentialsValidAfter': 'credentialsValidAfter' },
+          ExpressionAttributeValues: { ':cutoff': stringAttribute(cutoff) },
+        }),
+      );
+    } catch (error) {
+      if (!(error instanceof ConditionalCheckFailedException)) throw error;
+      const lookup = await this.getItem(key);
+      if (!lookup || requiredStringAttribute(lookup.credentialsValidAfter) < cutoff)
+        throw new Error('Credential cutoff could not be confirmed.', { cause: error });
+    }
   }
 
   async findChildProvisionReplay(
@@ -404,6 +449,33 @@ export class InMemoryHouseholdRepository implements HouseholdRepository {
     return sortDirectoryMembers(directory);
   }
 
+  async getHouseholdMemberTarget(
+    householdId: string,
+    memberId: string,
+  ): Promise<HouseholdMemberTarget | null> {
+    const membership = this.memberships.get(membershipStorageKey(householdId, memberId));
+    if (!membership) return null;
+    const lookup = this.lookups.get(membership.sub);
+    if (
+      !lookup ||
+      lookup.householdId !== householdId ||
+      lookup.memberId !== memberId ||
+      membership.memberId !== memberId ||
+      lookup.username !== membership.username ||
+      lookup.role !== membership.role ||
+      lookup.activationState !== membership.activationState
+    )
+      throw new Error('Member target lookup is inconsistent.');
+    return householdMemberTargetFromMembership(membership);
+  }
+
+  async advanceCredentialsValidAfter(sub: string, cutoff: string): Promise<void> {
+    const lookup = this.lookups.get(sub);
+    if (!lookup) throw new Error('Credential cutoff lookup does not exist.');
+    if (lookup.credentialsValidAfter && lookup.credentialsValidAfter >= cutoff) return;
+    lookup.credentialsValidAfter = cutoff;
+  }
+
   async findChildProvisionReplay(
     input: Omit<ProvisionChildInput, 'childSub'>,
   ): Promise<ProvisionChildResult | null> {
@@ -576,6 +648,28 @@ function directoryMemberFromMembership(
     activationState: membership.activationState,
     displayName: profile.displayName,
     color: profile.color,
+  };
+}
+
+function householdMemberTargetFromMembership(membership: Membership): HouseholdMemberTarget {
+  return {
+    memberId: membership.memberId,
+    sub: membership.sub,
+    username: membership.username,
+    role: membership.role,
+    activationState: membership.activationState,
+  };
+}
+
+function householdMemberTargetFromItem(
+  membership: Record<string, AttributeValue>,
+): HouseholdMemberTarget {
+  return {
+    memberId: requiredStringAttribute(membership.memberId),
+    sub: requiredStringAttribute(membership.sub),
+    username: requiredStringAttribute(membership.username),
+    role: requiredMembershipRole(membership.role),
+    activationState: requiredActivationState(membership.activationState),
   };
 }
 

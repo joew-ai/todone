@@ -157,6 +157,88 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+const resetChild: DirectoryMember = {
+  memberId: 'reset-child',
+  username: 'juniper',
+  displayName: 'Juniper River',
+  role: 'child',
+  activationState: 'ACTIVE',
+  color: 'LAKE',
+  allowedActions: [],
+};
+
+test('child password reset validates, submits once, and clears secrets across history and reload', async ({
+  page,
+}, testInfo) => {
+  await mockProfileAndDirectory(page, existingProfile, [resetChild]);
+  let writes = 0;
+  await page.route('**/api/v1/family-members/reset-child/password', async (route) => {
+    writes++;
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().postDataJSON()).toEqual({ password: 'Replacement1!' });
+    await route.fulfill({ status: 204 });
+  });
+  await signIn(page, () => membership);
+  await page.getByRole('link', { name: 'Reset child password' }).click();
+  await expect(page).toHaveURL(/\/family\/children\/reset-child\/password$/);
+  await expect(page.getByRole('heading', { name: 'Reset child password' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('child-password-reset.png'), fullPage: true });
+  const password = page.getByLabel('New password', { exact: true });
+  await password.fill('weak');
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click();
+  await expect(password).toHaveAttribute('aria-invalid', 'true');
+  await expect(password).toBeFocused();
+  expect(writes).toBe(0);
+  await password.fill('Replacement1!');
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click();
+  await expect(page).toHaveURL(/\/family$/);
+  await expect(page.getByRole('status')).toContainText('Child password reset.');
+  await page.getByRole('link', { name: 'Reset child password' }).click();
+  await expect(password).toHaveValue('');
+  await password.fill('NeverPersist1!');
+  await page.goBack();
+  await expect(page).toHaveURL(/\/family$/);
+  await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(/\/family\/children\/reset-child\/password$/);
+  await expect(page.getByRole('heading', { name: 'Reset child password' })).toBeVisible();
+  await expect(password).toHaveValue('');
+  await page.reload();
+  await expect(password).toHaveValue('');
+  expect(writes).toBe(1);
+  expect(page.url()).not.toContain('NeverPersist');
+  expect(await page.evaluate(() => JSON.stringify(history.state))).not.toContain('NeverPersist');
+});
+
+test('unavailable reset targets safely return to family management', async ({ page }) => {
+  await mockProfileAndDirectory(page, existingProfile, [resetChild]);
+  await signIn(page, () => membership);
+  await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
+  await page.goto('/family/children/absent/password');
+  await expect(page).toHaveURL(/\/family$/);
+  await expect(page.getByRole('heading', { name: 'Family management' })).toBeVisible();
+});
+
+test('uncertain child reset failure clears the password and prevents a second submission', async ({
+  page,
+}) => {
+  await mockProfileAndDirectory(page, existingProfile, [resetChild]);
+  let writes = 0;
+  await page.route('**/api/v1/family-members/reset-child/password', async (route) => {
+    writes++;
+    await route.fulfill({ status: 500, json: { error: { message: 'Safe error' } } });
+  });
+  await signIn(page, () => membership);
+  await page.getByRole('link', { name: 'Reset child password' }).click();
+  await page.getByLabel('New password', { exact: true }).fill('Replacement1!');
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click();
+  await expect(page.getByLabel('New password', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Reset password', exact: true })).toBeDisabled();
+  await page.getByRole('link', { name: 'Cancel', exact: true }).click();
+  await expect(page).toHaveURL(/\/family$/);
+  expect(writes).toBe(1);
+});
+
 test('registers, verifies email, signs in, creates a household, and reaches onboarding', async ({
   page,
 }) => {
@@ -300,7 +382,7 @@ test('renders a readable active and pending family directory without invented ac
   await expect(directory).not.toContainText('Child');
   await expect(directory).not.toContainText('Active');
   await expect(directory).not.toContainText('Lake');
-  await expect(directory.getByText('Parent')).toHaveCount(2);
+  await expect(directory.getByText('Parent', { exact: true })).toHaveCount(2);
   await expect(directory).toContainText('Morgan Vale');
   await expect(directory).toContainText('Pending activation');
   await expect(directory.getByRole('button')).toHaveCount(0);

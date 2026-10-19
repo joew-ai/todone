@@ -27,6 +27,7 @@ export async function simulateLambda(handler: Handler, req: Request, res: Respon
     rawQueryString: '',
     headers: req.headers as Record<string, string>,
     body,
+    pathParameters: req.params,
     requestContext: {
       requestId: randomUUID(),
       http: {

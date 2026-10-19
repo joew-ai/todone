@@ -81,6 +81,8 @@ describe('route access', () => {
     await router.push({ name: AppRouteName.newChild });
 
     expect(router.currentRoute.value.name).toBe(AppRouteName.todos);
+    await router.push({ name: AppRouteName.resetChildPassword, params: { memberId: 'peer' } });
+    expect(router.currentRoute.value.name).toBe(AppRouteName.todos);
   });
 
   it('keeps verification identity and code out of the route', async () => {

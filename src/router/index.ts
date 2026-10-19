@@ -86,7 +86,9 @@ async function resolveRouteAccess(to: RouteLocationNormalized) {
     routeName === AppRouteName.householdSetup ||
     routeName === AppRouteName.profileSetup ||
     (membership.role === 'child' &&
-      (routeName === AppRouteName.family || routeName === AppRouteName.newChild))
+      (routeName === AppRouteName.family ||
+        routeName === AppRouteName.newChild ||
+        routeName === AppRouteName.resetChildPassword))
   ) {
     return { name: homeRoute, replace: true };
   }

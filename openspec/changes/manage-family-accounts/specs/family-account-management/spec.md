@@ -73,6 +73,14 @@ A parent SHALL be able to set a new permanent password for a child account in th
 - **WHEN** a previously authenticated child calls a household API after their password is reset
 - **THEN** authorization rejects the pre-reset token and requires the child to sign in with the replacement password
 
+#### Scenario: Reset form navigation
+- **WHEN** a parent opens `/family/children/:memberId/password` and navigates, cancels, reloads, or traverses browser history
+- **THEN** the form resolves only an authorized household child, keeps passwords out of the URL/history, clears secret input, and never replays a reset automatically
+
+#### Scenario: Local emulator cannot sign out a child
+- **WHEN** reset is attempted through the local simulator whose Cognito emulator lacks global sign-out
+- **THEN** the API explicitly reports reset unavailable before any password mutation and the UI makes no success claim
+
 ### Requirement: Private Parent Recovery Email
 A parent's recovery email SHALL be visible only to that parent in their own security settings and SHALL NOT appear in family management or another parent's APIs. An authenticated parent SHALL be able to replace only their own recovery email. The existing verified email SHALL remain active until the replacement email completes verification, after which Cognito Forgot Password SHALL use the replacement.
 

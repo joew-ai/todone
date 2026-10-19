@@ -17,16 +17,23 @@ export const ApiErrorCode = {
 export const HttpStatus = {
   ok: 200,
   created: 201,
+  noContent: 204,
   badRequest: 400,
   unauthorized: 401,
   forbidden: 403,
+  notFound: 404,
   conflict: 409,
   unprocessableContent: 422,
   internalServerError: 500,
+  serviceUnavailable: 503,
 } as const;
 
 export function json(statusCode: number, value: unknown): APIGatewayProxyStructuredResultV2 {
   return { statusCode, headers: JSON_NO_STORE_HEADERS, body: JSON.stringify(value) };
+}
+
+export function noContentResponse(): APIGatewayProxyStructuredResultV2 {
+  return { statusCode: HttpStatus.noContent, headers: { 'cache-control': 'no-store' } };
 }
 
 export function errorResponse(

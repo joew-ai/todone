@@ -12,6 +12,7 @@ import { handler as currentMembershipHandler } from '../lambdas/households/curre
 import { handler as createHouseholdHandler } from '../lambdas/households/create';
 import { handler as familyDirectoryHandler } from '../lambdas/households/directory';
 import { handler as createChildHandler } from '../lambdas/households/children';
+import { handler as resetChildPasswordHandler } from '../lambdas/households/resetChildPassword';
 import {
   readHandler as readProfileHandler,
   updateHandler as updateProfileHandler,
@@ -78,6 +79,18 @@ app.get('/api/v1/family-members', async (req, res) => {
 app.post('/api/v1/family-members/children', async (req, res) => {
   await simulateLambda(
     (event) => createChildHandler(event, { repository: householdRepository }),
+    req,
+    res,
+  );
+});
+
+app.put('/api/v1/family-members/:memberId/password', async (req, res) => {
+  await simulateLambda(
+    (event) =>
+      resetChildPasswordHandler(event, {
+        repository: householdRepository,
+        passwordResetAvailable: false,
+      }),
     req,
     res,
   );

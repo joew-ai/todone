@@ -38,10 +38,23 @@ export type CreateChildResult =
       fieldErrors?: Array<{ field: string; code: string; message: string }>;
     };
 
+export type ResetChildPasswordResult =
+  | { kind: 'success' }
+  | {
+      kind: 'error';
+      message: string;
+      recoverable: boolean;
+      sessionExpired?: boolean;
+      fieldErrors?: Array<{ field: string; code: string; message: string }>;
+    };
+
 const FamilyApiRoute = {
   members: '/api/v1/family-members',
   children: '/api/v1/family-members/children',
+  childPassword: (memberId: string) =>
+    `/api/v1/family-members/${encodeURIComponent(memberId)}/password`,
 } as const;
+const PASSWORD_RESET_UNAVAILABLE = 'PASSWORD_RESET_UNAVAILABLE';
 
 /** Reads the authenticated caller's safe household directory; no target IDs are accepted. */
 export async function fetchFamilyMembers(
@@ -61,6 +74,45 @@ export async function fetchFamilyMembers(
           ? messages.familyClient.sessionEnded
           : (body?.error?.message ?? messages.familyClient.requestFailed),
       recoverable: response.status !== 401,
+    };
+  } catch {
+    return { kind: 'error', message: messages.generic.networkError, recoverable: true };
+  }
+}
+
+/** Sends the replacement password only in this immediate non-cacheable request. */
+export async function resetChildPassword(
+  idToken: string,
+  memberId: string,
+  password: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ResetChildPasswordResult> {
+  try {
+    const { response, body } = await fetchAuthenticatedJson<{
+      error?: {
+        code?: string;
+        message?: string;
+        fieldErrors?: Array<{ field: string; code: string; message: string }>;
+      };
+    }>(
+      FamilyApiRoute.childPassword(memberId),
+      idToken,
+      {
+        method: HttpMethod.put,
+        headers: { [HttpHeader.contentType]: APPLICATION_JSON },
+        body: JSON.stringify({ password }),
+      },
+      fetchImpl,
+    );
+    if (response.status === 204) return { kind: 'success' };
+    return {
+      kind: 'error',
+      message: body?.error?.message ?? messages.familyClient.requestFailed,
+      recoverable:
+        response.status !== 401 &&
+        (response.status < 500 || body?.error?.code === PASSWORD_RESET_UNAVAILABLE),
+      sessionExpired: response.status === 401,
+      ...(body?.error?.fieldErrors ? { fieldErrors: body.error.fieldErrors } : {}),
     };
   } catch {
     return { kind: 'error', message: messages.generic.networkError, recoverable: true };

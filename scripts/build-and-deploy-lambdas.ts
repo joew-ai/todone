@@ -41,6 +41,7 @@ const DEPLOYABLE_LAMBDAS = {
   profile: 'lambdas/households/profile.ts',
   'family-directory': 'lambdas/households/directory.ts',
   'create-child': 'lambdas/households/children.ts',
+  'reset-child-password': 'lambdas/households/resetChildPassword.ts',
   'pre-signup': 'lambdas/pre-signup/index.ts',
 } as const;
 

@@ -15,6 +15,10 @@ interface LambdaMessages {
     reauthenticationRequired: string;
     internalError: string;
     usernameConflict: string;
+    targetNotFound: string;
+    targetNotManageable: string;
+    invalidPassword: string;
+    localPasswordResetUnavailable: string;
   };
   cognitoAdministration: {
     usernameConflict: string;

@@ -95,6 +95,15 @@ export interface ProvisionChildInput {
   idempotencyKey: string;
 }
 
+/** Internal target record; it is never returned from a family-directory API. */
+export interface HouseholdMemberTarget {
+  memberId: string;
+  sub: string;
+  username: string;
+  role: MembershipRole;
+  activationState: MembershipActivationState;
+}
+
 export type ProvisionChildResult =
   | { kind: 'created' | 'replayed'; member: FamilyDirectoryMember }
   | { kind: 'idempotency-conflict' };
@@ -121,6 +130,12 @@ export interface HouseholdRepository {
   getProfile(householdId: string, memberId: string): Promise<Profile | null>;
   saveProfile(input: SaveProfileInput): Promise<SaveProfileResult>;
   listFamilyMembers(householdId: string): Promise<FamilyDirectoryMember[]>;
+  getHouseholdMemberTarget(
+    householdId: string,
+    memberId: string,
+  ): Promise<HouseholdMemberTarget | null>;
+  /** Advances the one canonical identity-session cutoff without ever moving it backwards. */
+  advanceCredentialsValidAfter(sub: string, cutoff: string): Promise<void>;
   /** Checks a completed child-provisioning request before any Cognito side effect. */
   findChildProvisionReplay(
     input: Omit<ProvisionChildInput, 'childSub'>,

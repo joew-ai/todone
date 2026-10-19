@@ -71,6 +71,7 @@ interface EnglishMessages {
     profileTitle: string;
     securityTitle: string;
     newChildTitle: string;
+    resetChildPasswordTitle: string;
     newParentTitle: string;
   };
   bootstrap: BootstrapMessages;
@@ -83,6 +84,15 @@ interface EnglishMessages {
     conflict: string;
   };
   profileClient: { sessionEnded: string; requestFailed: string };
+  membershipApi: {
+    accessUnavailable: string;
+    reauthenticationRequired: string;
+    internalError: string;
+    usernameConflict: string;
+    targetNotFound: string;
+    targetNotManageable: string;
+    invalidPassword: string;
+  };
   profileSetup: {
     heading: string;
     help: string;
@@ -125,6 +135,12 @@ interface EnglishMessages {
     creatingChild: string;
     childCreated: string;
     provisioningUnavailable: string;
+    resetChildPassword: string;
+    resetChildPasswordHelp: string;
+    resetChildPasswordAction: string;
+    resettingChildPassword: string;
+    childPasswordReset: string;
+    resetUnavailable: string;
   };
 }
 

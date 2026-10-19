@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createChild, fetchFamilyMembers } from '../../services/familyClient';
+import { createChild, fetchFamilyMembers, resetChildPassword } from '../../services/familyClient';
 
 describe('family directory API client', () => {
   it('uses the self-derived directory route with bearer authentication and no-store', async () => {
@@ -21,6 +21,51 @@ describe('family directory API client', () => {
         headers: expect.objectContaining({ authorization: 'Bearer private-token' }),
       }),
     );
+  });
+});
+
+describe('child password reset API client', () => {
+  it('sends a single no-store PUT without an idempotency record and accepts an empty 204', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    await expect(
+      resetChildPassword('private-token', 'child', 'Replacement1!', fetchMock),
+    ).resolves.toEqual({ kind: 'success' });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [path, options] = fetchMock.mock.calls[0];
+    expect(path).toBe('/api/v1/family-members/child/password');
+    expect(options).toMatchObject({
+      method: 'PUT',
+      cache: 'no-store',
+      body: JSON.stringify({ password: 'Replacement1!' }),
+    });
+    expect(options.headers).not.toHaveProperty('idempotency-key');
+  });
+
+  it.each([401, 500])(
+    'distinguishes expired sessions from uncertain failures (%s)',
+    async (status) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: { message: 'Safe failure' } }), { status }),
+        );
+      await expect(
+        resetChildPassword('token', 'child', 'Replacement1!', fetchMock),
+      ).resolves.toMatchObject({
+        kind: 'error',
+        recoverable: false,
+        sessionExpired: status === 401,
+      });
+      expect(fetchMock).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('does not automatically retry after a lost response', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('Lost response'));
+    await expect(
+      resetChildPassword('token', 'child', 'Replacement1!', fetchMock),
+    ).resolves.toMatchObject({ kind: 'error', recoverable: true });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
 

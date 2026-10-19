@@ -44,6 +44,8 @@ flowchart TD
    for them.
 4. Any member can edit only their own display name and profile color.
 5. A parent may reset a child password after explicit target identification. The password is never persisted or repeated.
+
+   The child row links to `/family/children/:memberId/password`. The form identifies the child by display name and username, explains that successful reset signs out other devices, and uses the shared password guidance. Cancel returns to Family without mutation. Back/Forward/reload clear the password. A successful reset returns to Family with a persistent confirmation; an uncertain failure clears the password and disables ordinary resubmission. Missing targets return to Family and child callers are redirected to their own Todo landing.
 6. A parent cannot reset, remove, demote, or edit another parent.
 7. Child removal requires confirmation describing the full deployed cascade. Success invalidates stale sessions, removes child-associated data, and releases the username only after the cascade completes. Cancellation changes nothing.
 8. A partial Cognito/application-data failure returns a generic request-ID result that does not

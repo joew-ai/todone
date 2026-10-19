@@ -15,6 +15,7 @@ export const AppRouteName = {
   profile: 'profile',
   security: 'security',
   newChild: 'new-child',
+  resetChildPassword: 'reset-child-password',
   newParent: 'new-parent',
 } as const;
 
@@ -30,7 +31,8 @@ export type BootstrapPageScreen =
   | 'profile-setup'
   | 'family-management'
   | 'profile-edit'
-  | 'child-create';
+  | 'child-create'
+  | 'child-password-reset';
 
 type AppRouteDefinition = {
   name: AppRouteName;
@@ -139,6 +141,12 @@ export const appRouteDefinitions: Record<AppRouteName, AppRouteDefinition> = {
     path: '/family/children/new',
     title: messages.navigation.newChildTitle,
     bootstrapScreen: 'child-create',
+  },
+  [AppRouteName.resetChildPassword]: {
+    name: AppRouteName.resetChildPassword,
+    path: '/family/children/:memberId/password',
+    title: messages.navigation.resetChildPasswordTitle,
+    bootstrapScreen: 'child-password-reset',
   },
   [AppRouteName.newParent]: {
     name: AppRouteName.newParent,

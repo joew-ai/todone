@@ -56,6 +56,7 @@ export const HouseholdField = {
   username: 'username',
   displayName: 'displayName',
   color: 'color',
+  password: 'password',
 } as const;
 
 export const HouseholdErrorCode = {
@@ -73,6 +74,10 @@ export const HouseholdErrorCode = {
   memberAccessUnavailable: 'MEMBER_ACCESS_UNAVAILABLE',
   sessionReauthenticationRequired: 'SESSION_REAUTHENTICATION_REQUIRED',
   internalError: 'INTERNAL_ERROR',
+  targetNotFound: 'TARGET_NOT_FOUND',
+  targetNotManageable: 'TARGET_NOT_MANAGEABLE',
+  invalidPassword: 'INVALID_PASSWORD',
+  passwordResetUnavailable: 'PASSWORD_RESET_UNAVAILABLE',
 } as const;
 
 export const MAX_HOUSEHOLD_NAME_LENGTH = 80;

@@ -20,8 +20,10 @@ import {
 import {
   createChild,
   fetchFamilyMembers,
+  resetChildPassword,
   type CreateChildInput,
   type CreateChildResult,
+  type ResetChildPasswordResult,
   type FamilyMember,
 } from '../services/familyClient';
 import {
@@ -95,6 +97,8 @@ const childUsername = ref('');
 const childDisplayName = ref('');
 const childColor = ref<ProfileColorId | ''>('');
 const childPassword = ref('');
+const replacementChildPassword = ref('');
+const childResetBlocked = ref(false);
 const childProvisioningBlocked = ref(false);
 const fieldError = ref<Record<string, string>>({});
 const firstField = ref<{ focus(): void } | null>(null);
@@ -102,6 +106,15 @@ const registrationPasswordField = ref<{ focus(): void } | null>(null);
 const resetPasswordField = ref<{ focus(): void } | null>(null);
 const childUsernameField = ref<{ focus(): void } | null>(null);
 const childPasswordField = ref<{ focus(): void } | null>(null);
+const replacementChildPasswordField = ref<{ focus(): void } | null>(null);
+const resetTarget = computed(() =>
+  familyMembers.value.find(
+    (member) =>
+      member.memberId === route.params.memberId &&
+      member.role === 'child' &&
+      member.activationState === 'ACTIVE',
+  ),
+);
 let idempotencyKey = globalThis.crypto.randomUUID();
 let childIdempotencyKey = globalThis.crypto.randomUUID();
 let authClient: AuthClient | null = null;
@@ -125,10 +138,21 @@ watch(screen, (currentScreen) => {
 });
 
 watch(
-  () => route.name,
-  (routeName) => {
+  () => route.fullPath,
+  () => {
+    const routeName = route.name;
     if (routeName === AppRouteName.profile) prepareProfileEdit();
     if (routeName !== AppRouteName.newChild) clearChildForm();
+    replacementChildPassword.value = '';
+    childResetBlocked.value = false;
+    fieldError.value = {};
+    if (
+      routeName === AppRouteName.resetChildPassword &&
+      transientScreen.value === null &&
+      !resetTarget.value
+    ) {
+      void navigate(AppRouteName.family, true);
+    }
   },
 );
 
@@ -273,6 +297,10 @@ async function resolveProfile(idToken: string): Promise<void> {
     transientScreen.value = null;
     return;
   }
+  if (route.name === AppRouteName.resetChildPassword) {
+    await loadFamilyManagement(idToken, true);
+    return;
+  }
   if (route.name === AppRouteName.profile) {
     displayName.value = profile.value.displayName;
     profileColor.value = profile.value.color;
@@ -282,7 +310,7 @@ async function resolveProfile(idToken: string): Promise<void> {
   await loadFamilyManagement(idToken);
 }
 
-async function loadFamilyManagement(idToken: string): Promise<void> {
+async function loadFamilyManagement(idToken: string, preserveRoute = false): Promise<void> {
   transientScreen.value = 'family-loading';
   const result = await fetchFamilyMembers(idToken);
   if (result.kind === 'error') {
@@ -297,8 +325,57 @@ async function loadFamilyManagement(idToken: string): Promise<void> {
   }
   familyMembers.value = result.data.members;
   transientScreen.value = null;
-  if (route.name !== AppRouteName.family) {
+  if (preserveRoute && !resetTarget.value) {
+    status.value = messages.membershipApi.targetNotFound;
+    statusIsError.value = true;
     await navigate(AppRouteName.family, true);
+    return;
+  }
+  if (!preserveRoute && route.name !== AppRouteName.family) {
+    await navigate(AppRouteName.family, true);
+  }
+}
+
+async function submitChildPasswordReset(): Promise<void> {
+  if (busy.value || childResetBlocked.value) return;
+  fieldError.value = {};
+  const target = resetTarget.value;
+  if (!target) {
+    await navigate(AppRouteName.family, true);
+    return;
+  }
+  if (!(await validatePassword(replacementChildPassword.value, replacementChildPasswordField)))
+    return;
+  await run(async () => applyChildPasswordReset(target.memberId));
+}
+
+async function applyChildPasswordReset(memberId: string): Promise<void> {
+  const token = client().requireIdToken();
+  const result = await resetChildPassword(token, memberId, replacementChildPassword.value);
+  replacementChildPassword.value = '';
+  if (result.kind === 'error') {
+    await showChildResetError(result);
+    return;
+  }
+  status.value = familyCopy.childPasswordReset;
+  statusIsError.value = false;
+  await loadFamilyManagement(token);
+}
+
+async function showChildResetError(
+  result: Extract<ResetChildPasswordResult, { kind: 'error' }>,
+): Promise<void> {
+  if (result.sessionExpired) {
+    signOut(copy.sessionEnded);
+    return;
+  }
+  for (const error of result.fieldErrors ?? []) fieldError.value[error.field] = error.message;
+  status.value = result.recoverable ? result.message : familyCopy.resetUnavailable;
+  childResetBlocked.value = !result.recoverable;
+  statusIsError.value = true;
+  if (fieldError.value.password) {
+    await nextTick();
+    replacementChildPasswordField.value?.focus();
   }
 }
 
@@ -385,7 +462,9 @@ function prepareProfileEdit(): void {
 }
 
 async function retryFamilyManagement(): Promise<void> {
-  await run(async () => loadFamilyManagement(client().requireIdToken()));
+  await run(async () =>
+    loadFamilyManagement(client().requireIdToken(), route.name === AppRouteName.resetChildPassword),
+  );
 }
 
 async function submitChild(): Promise<void> {
@@ -486,6 +565,8 @@ function clearPrivateState(message: string): void {
   clearProfileTone();
   familyMembers.value = [];
   clearChildForm();
+  replacementChildPassword.value = '';
+  childResetBlocked.value = false;
   username.value = '';
   email.value = '';
   fieldError.value = {};
@@ -920,6 +1001,47 @@ async function focusRouteHeading(): Promise<void> {
       <button type="button" class="link" @click="signOut()">{{ copy.signOut }}</button>
     </div>
 
+    <form
+      v-else-if="screen === 'child-password-reset' && resetTarget"
+      class="space-y-5"
+      @submit.prevent="submitChildPasswordReset"
+    >
+      <h2 class="page-heading text-xl">{{ familyCopy.resetChildPassword }}</h2>
+      <p class="body-muted text-sm">{{ resetTarget.displayName }} · @{{ resetTarget.username }}</p>
+      <p class="body-muted text-sm">{{ familyCopy.resetChildPasswordHelp }}</p>
+      <label class="block"
+        >{{ copy.newPassword
+        }}<input
+          ref="replacementChildPasswordField"
+          v-model="replacementChildPassword"
+          required
+          type="password"
+          autocomplete="new-password"
+          class="field"
+          :disabled="busy || childResetBlocked"
+          :aria-invalid="!!fieldError.password"
+          aria-describedby="reset-child-password-policy reset-child-password-error"
+      /></label>
+      <span id="reset-child-password-policy" class="body-muted -mt-3 block text-sm">{{
+        copy.passwordPolicy
+      }}</span>
+      <span id="reset-child-password-error" class="error">{{ fieldError.password }}</span>
+      <div class="form-actions">
+        <button class="primary" type="submit" :disabled="busy || childResetBlocked">
+          {{ busy ? familyCopy.resettingChildPassword : familyCopy.resetChildPasswordAction }}
+        </button>
+        <RouterLink
+          :to="{ name: AppRouteName.family }"
+          class="link inline-flex items-center"
+          :aria-disabled="busy"
+          :tabindex="busy ? -1 : undefined"
+          @click="busy ? $event.preventDefault() : undefined"
+        >
+          {{ familyCopy.cancel }}
+        </RouterLink>
+      </div>
+    </form>
+
     <form v-else-if="screen === 'child-create'" class="space-y-5" @submit.prevent="submitChild">
       <h2 class="page-heading text-xl">{{ familyCopy.createChild }}</h2>
       <p class="body-muted text-sm">{{ familyCopy.createChildHelp }}</p>
@@ -1046,6 +1168,10 @@ async function focusRouteHeading(): Promise<void> {
                 <dt class="sr-only">{{ familyCopy.role }}</dt>
                 <dd>{{ familyCopy.parent }}</dd>
               </div>
+              <div v-if="member.activationState === 'PENDING_ACTIVATION'">
+                <dt class="sr-only">{{ familyCopy.status }}</dt>
+                <dd>{{ familyCopy.pending }}</dd>
+              </div>
             </dl>
           </div>
           <RouterLink
@@ -1055,6 +1181,13 @@ async function focusRouteHeading(): Promise<void> {
             @click="prepareProfileEdit"
           >
             {{ familyCopy.editProfile }}
+          </RouterLink>
+          <RouterLink
+            v-else-if="member.role === 'child' && member.activationState === 'ACTIVE'"
+            :to="{ name: AppRouteName.resetChildPassword, params: { memberId: member.memberId } }"
+            class="link family-member__action"
+          >
+            {{ familyCopy.resetChildPassword }}
           </RouterLink>
         </li>
       </ul>

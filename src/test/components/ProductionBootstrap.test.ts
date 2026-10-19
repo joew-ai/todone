@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
+
+enableAutoUnmount(afterEach);
 
 const restoreSession = vi.fn();
 const signIn = vi.fn();
@@ -18,6 +20,7 @@ const fetchMyProfile = vi.fn();
 const saveMyProfile = vi.fn();
 const fetchFamilyMembers = vi.fn();
 const createChild = vi.fn();
+const resetChildPassword = vi.fn();
 
 vi.mock('../../config/authConfig', () => ({
   loadAuthConfig: () => ({
@@ -49,7 +52,11 @@ vi.mock('../../services/profileClient', () => ({
   ProfileColor: { pine: 'PINE', lake: 'LAKE' },
   ProfileColorHex: { PINE: '#2F6B4F', LAKE: '#337B8C' },
 }));
-vi.mock('../../services/familyClient', () => ({ fetchFamilyMembers, createChild }));
+vi.mock('../../services/familyClient', () => ({
+  fetchFamilyMembers,
+  createChild,
+  resetChildPassword,
+}));
 
 const { default: ProductionBootstrap } = await import('../../components/ProductionBootstrap.vue');
 const { router } = await import('../../router');
@@ -251,6 +258,108 @@ describe('ProductionBootstrap', () => {
     );
     expect(wrapper.find('input[autocomplete="new-password"]').exists()).toBe(false);
     expect(router.currentRoute.value.name).toBe(AppRouteName.family);
+  });
+
+  async function openChildReset() {
+    restoreSession.mockResolvedValue({ idToken: 'token' });
+    fetchCurrentMembership.mockResolvedValue({ kind: 'success', data: { membership } });
+    fetchMyProfile.mockResolvedValue({
+      kind: 'success',
+      data: {
+        profile: {
+          memberId: 'member-one',
+          displayName: 'River',
+          color: 'PINE',
+          version: 1,
+        },
+      },
+    });
+    fetchFamilyMembers.mockResolvedValue({
+      kind: 'success',
+      data: {
+        members: [
+          {
+            memberId: 'child',
+            username: 'child-one',
+            role: 'child',
+            activationState: 'ACTIVE',
+            displayName: 'Child One',
+            color: 'PINE',
+            allowedActions: [],
+          },
+          {
+            memberId: 'child-two',
+            username: 'child-two',
+            role: 'child',
+            activationState: 'ACTIVE',
+            displayName: 'Child Two',
+            color: 'PINE',
+            allowedActions: [],
+          },
+        ],
+      },
+    });
+    await router.push({ name: AppRouteName.resetChildPassword, params: { memberId: 'child' } });
+    const wrapper = mountBootstrap({ attachTo: document.body });
+    await flushPromises();
+    return wrapper;
+  }
+
+  it('validates reset password accessibly and clears it after confirmed submission', async () => {
+    const wrapper = await openChildReset();
+    const field = wrapper.get('input[autocomplete="new-password"]');
+    await field.setValue('weak');
+    await wrapper.get('form').trigger('submit');
+    expect(field.attributes('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(field.element);
+    expect(resetChildPassword).not.toHaveBeenCalled();
+    resetChildPassword.mockResolvedValue({ kind: 'success' });
+    await field.setValue('Replacement1!');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(resetChildPassword).toHaveBeenCalledWith('id-token', 'child', 'Replacement1!');
+    expect(router.currentRoute.value.name).toBe(AppRouteName.family);
+    expect(wrapper.text()).toContain('Child password reset.');
+    wrapper.unmount();
+  });
+
+  it('clears reset secrets across same-route target changes and cancellation', async () => {
+    const wrapper = await openChildReset();
+    await wrapper.get('input[type="password"]').setValue('Replacement1!');
+    await router.push({ name: AppRouteName.resetChildPassword, params: { memberId: 'child-two' } });
+    await flushPromises();
+    expect(wrapper.get('input[type="password"]').element.value).toBe('');
+    await wrapper.get('input[type="password"]').setValue('Replacement1!');
+    await wrapper.get('.form-actions a').trigger('click');
+    await flushPromises();
+    expect(resetChildPassword).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('blocks repeat submission after an uncertain reset outcome', async () => {
+    const wrapper = await openChildReset();
+    resetChildPassword.mockResolvedValue({
+      kind: 'error',
+      message: 'safe error',
+      recoverable: false,
+    });
+    await wrapper.get('input[type="password"]').setValue('Replacement1!');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('input[type="password"]').element.value).toBe('');
+    expect(wrapper.get('button[type="submit"]').attributes()).toHaveProperty('disabled');
+    await wrapper.get('form').trigger('submit');
+    expect(resetChildPassword).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+
+  it('redirects an unavailable reset target to the family directory', async () => {
+    const wrapper = await openChildReset();
+    await router.push({ name: AppRouteName.resetChildPassword, params: { memberId: 'absent' } });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe(AppRouteName.family);
+    expect(wrapper.find('input[type="password"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 
   it('offers generic Forgot Password initiation and completes recovery', async () => {

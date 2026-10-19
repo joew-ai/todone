@@ -7,6 +7,7 @@ import {
   type CognitoAdministration,
 } from '../../../lambdas/cognito/administration';
 import { handler } from '../../../lambdas/households/children';
+import { handler as resetChildPassword } from '../../../lambdas/households/resetChildPassword';
 import { InMemoryHouseholdRepository } from '../../../lambdas/households/repository';
 
 const parentSub = 'parent-sub';
@@ -61,7 +62,9 @@ function administration(calls: string[], failure?: Error): CognitoAdministration
     async updatePendingParentEmail() {},
     async markEmailVerified() {},
     async deleteUser() {},
-    async globalSignOut() {},
+    async globalSignOut(username) {
+      calls.push(`global-sign-out:${username}`);
+    },
   };
 }
 
@@ -161,5 +164,44 @@ describe('child provisioning handler', () => {
     };
     expect(body.error.message).not.toContain('child-one');
     expect(body.error.requestId).toEqual(expect.any(String));
+  });
+
+  it('resets only a same-household child, signs it out, and cuts off prior tokens', async () => {
+    const repository = await parentRepository();
+    const calls: string[] = [];
+    await handler(request(), { repository, administration: administration(calls) });
+    const response = await resetChildPassword(
+      {
+        ...request({ body: { password: 'ReplacementPassword1!' } }),
+        pathParameters: { memberId: 'child-member-id' },
+      },
+      {
+        repository,
+        administration: administration(calls),
+        now: () => new Date('2026-08-30T12:00:00.000Z'),
+      },
+    );
+
+    expect(response.statusCode).toBe(204);
+    expect(calls).toContain('password:child-one');
+    expect(calls).toContain('global-sign-out:child-one');
+    await expect(repository.resolveMembership('child-sub', 1788091200)).resolves.toEqual({
+      kind: 'credentials-stale',
+    });
+  });
+
+  it('denies a peer-parent target before any Cognito call', async () => {
+    const repository = await parentRepository();
+    const calls: string[] = [];
+    const response = await resetChildPassword(
+      {
+        ...request({ body: { password: 'ReplacementPassword1!' } }),
+        pathParameters: { memberId: 'parent-member-id' },
+      },
+      { repository, administration: administration(calls) },
+    );
+
+    expect(response.statusCode).toBe(403);
+    expect(calls).toEqual([]);
   });
 });

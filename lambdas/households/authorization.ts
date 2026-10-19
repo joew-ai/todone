@@ -10,6 +10,7 @@ import type { APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import type {
   CurrentMembership,
   FamilyDirectoryMember,
+  HouseholdMemberTarget,
   HouseholdRepository,
   MembershipResolution,
 } from './model';
@@ -85,7 +86,7 @@ export async function requireActiveParent(
 /** A parent may administer only an active child in their resolved household, never a peer parent. */
 export function isManageableChild(
   caller: CurrentMembership,
-  target: FamilyDirectoryMember,
+  target: Pick<FamilyDirectoryMember | HouseholdMemberTarget, 'role' | 'activationState'>,
   targetHouseholdId: string,
 ): boolean {
   return (

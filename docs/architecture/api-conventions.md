@@ -137,6 +137,10 @@ the complete outcome, it returns generic `500 INTERNAL_ERROR` with the request I
 no automatic repair state machine or household repair UI; an authorized operator inspects and
 cleans the orphan before the product retries the username or destructive transition.
 
+The reset form lives at `/family/children/:memberId/password`; only the opaque member ID enters the URL. Its target is resolved from the parent's household directory. Parent/child route guards, missing-target fallback, cancel, Back/Forward, and reload never restore the password or replay a write. A successful reset response is empty and `no-store`. Cutoff writes require an existing lookup and cannot move the timestamp backwards; a concurrent equal/newer cutoff is confirmed with a strong read. Tokens issued in the same second as the cutoff are deliberately stale; a replacement sign-in token must be issued in a later second.
+
+The local simulator returns `503 PASSWORD_RESET_UNAVAILABLE` before any credential mutation because its Cognito emulator lacks global sign-out. This is a known local capability limit, not a successful production reset.
+
 ## Authentication and authorization
 
 - Protected requests use `Authorization: Bearer <Cognito ID token>` over HTTPS. Tokens MUST NOT appear in URLs, logs, error text, analytics, or persistent application data.

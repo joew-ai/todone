@@ -63,6 +63,10 @@ Open `http://localhost:3001`, enter the local development account, and confirm t
 
 The local API simulator also exposes `POST /api/v1/family-members/children` and directs its administrative Cognito calls to `cognito-local` only when setup writes both `TODONE_LOCAL_DEVELOPMENT=true` and a loopback `COGNITO_LOCAL_ENDPOINT`. After creating a local parent household and profile, developers can use `/family/children/new` to exercise the child form. This confirms local request wiring only; the emulator does not prove AWS Cognito's production authorization, app-client permissions, or partial-failure behavior.
 
+`cognito-local` does **not** implement `AdminUserGlobalSignOut`. The local password-reset route authenticates the parent and target, then returns `503 PASSWORD_RESET_UNAVAILABLE` before changing the password. The UI reports that no password changed. Do not bypass sign-out to simulate a successful reset. Handler/repository and HTTP integration tests prove operation ordering, conditional cutoff advancement, and old/equal/missing-`iat` rejection with deterministic service boundaries; successful AWS password replacement/sign-out remains a release-owner smoke check.
+
+After the setup and `npm run dev:full` commands above, run `npm run test:e2e:local-auth`. Its separate local Playwright configuration targets port 3001, uses real emulator authentication and local API requests, and disables credential-bearing trace/screenshot/video artifacts. The smoke creates a disposable local child, observes the unavailable reset, then signs in with that child's original password. The in-memory household data resets whenever the API process restarts; local Cognito identities persist in the ignored emulator database.
+
 To reset local identities, stop the emulator, delete `.cognito/db/`, delete `.env.local`, and repeat the bootstrap steps. This deletes synthetic local data only.
 
 ## Test layers

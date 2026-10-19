@@ -143,6 +143,15 @@ async function signInAsParent(page: Page): Promise<void> {
             color: 'MOSS',
             allowedActions: ['RESEND_WELCOME'],
           },
+          {
+            memberId: 'child-member',
+            username: 'juniper',
+            role: 'child',
+            activationState: 'ACTIVE',
+            displayName: 'Juniper River',
+            color: 'LAKE',
+            allowedActions: [],
+          },
         ],
       },
     }),
@@ -184,6 +193,39 @@ test('the parent child-creation form has no detectable WCAG A/AA violations', as
   await page.getByRole('link', { name: 'Create child account' }).click();
   await expect(page.getByRole('heading', { name: 'Create child account' })).toBeVisible();
 
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+    .analyze();
+  expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
+});
+
+test('child reset form and validation error remain accessible at 320 pixels and 200 percent zoom', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await signInAsParent(page);
+  await page.getByRole('link', { name: 'Reset child password' }).click();
+  await expect(page.getByRole('heading', { name: 'Reset child password' })).toBeFocused();
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByLabel('New password', { exact: true }).fill('weak');
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click();
+  await expect(page.getByLabel('New password', { exact: true })).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+  const overflow = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('body *'))
+      .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .map(
+        (element) =>
+          `${element.tagName}.${element.className}: ${element.getBoundingClientRect().right}`,
+      ),
+  );
+  expect(overflow).toEqual([]);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();

@@ -1,24 +1,20 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
+import { nextTick, onActivated, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { messages } from '../i18n/messages';
-import { loadAuthConfig } from '../config/authConfig';
-import { AuthClient } from '../services/authClient';
-import { clearLocalAuthentication } from '../services/localSignOut';
-import { takeRouteBootstrapContext } from '../presentation/routeBootstrapContext';
+import { useSessionController } from '../session/injection';
 import { AppRouteName } from '../router/routes';
 
 const router = useRouter();
-const initialContext = takeRouteBootstrapContext(AppRouteName.todos);
-
+const session = useSessionController();
 async function signOut(): Promise<void> {
-  clearLocalAuthentication(initialContext?.authClient ?? new AuthClient(loadAuthConfig()));
+  session.signOut();
   await router.replace({ name: AppRouteName.signIn });
 }
 
 const heading = ref<{ focus(): void } | null>(null);
 
-onMounted(async () => {
+onActivated(async () => {
   await nextTick();
   heading.value?.focus();
 });

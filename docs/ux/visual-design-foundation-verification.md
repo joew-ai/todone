@@ -1,6 +1,6 @@
 # Visual foundation verification
 
-Status on 2026-10-19: 10/13 OpenSpec tasks complete. Completed verification tasks include 3.1 and 3.4; production-review correction 2.4 is also complete. Tasks 3.2, 3.3, and 3.5 remain incomplete; none are intentionally deferred. This is not a completed review handoff.
+Status on 2026-10-19: 10/13 OpenSpec tasks complete. Completed verification tasks include 3.1 and 3.4; production-review correction 2.4 is also complete. Tasks 3.2, 3.3, and 3.5 remain incomplete; none are intentionally deferred. The product owner approved the visual changes and requested archive on 2026-10-19; the three unfinished verification items remain recorded below.
 
 ## Implementation and automated evidence
 

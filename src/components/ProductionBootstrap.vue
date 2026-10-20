@@ -545,7 +545,7 @@ function prepareProfileEdit(): void {
 
 async function retryFamilyManagement(): Promise<void> {
   await run(async () =>
-    loadFamilyManagement(session.requireIdToken(), route.name === AppRouteName.resetChildPassword),
+    loadFamilyManagement(session.requestContext(), route.name === AppRouteName.resetChildPassword),
   );
 }
 

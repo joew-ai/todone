@@ -778,6 +778,41 @@ test('startup retry stays cancellable and late context cannot resurrect sign-out
   await expect(page.getByRole('navigation', { name: 'Application' })).toHaveCount(0);
 });
 
+test('Family Retry renews expired credentials instead of signing the user out', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockProfileAndDirectory(page, existingProfile);
+  let directoryReads = 0;
+  await page.route('**/api/v1/family-members', async (route) => {
+    directoryReads++;
+    if (directoryReads === 1) {
+      await route.fulfill({ status: 503, json: { error: { code: 'UNAVAILABLE' } } });
+      return;
+    }
+    await route.fallback();
+  });
+  let renewals = 0;
+  page.on('request', (request) => {
+    if (
+      request.headers()['x-amz-target']?.endsWith('.InitiateAuth') &&
+      request.postDataJSON().AuthFlow === 'REFRESH_TOKEN_AUTH'
+    )
+      renewals++;
+  });
+  await signIn(page, () => membership);
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+  const now = await page.evaluate(() => Date.now());
+  // Advance wall time without firing scheduled renewal, as after a suspended tab.
+  await page.clock.setSystemTime(new Date(now + 3_601_000));
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.getByText('@parentone')).toBeVisible();
+  await expect(page).toHaveURL(/\/family$/);
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toHaveCount(0);
+  expect(renewals).toBe(1);
+  expect(directoryReads).toBe(2);
+});
+
 test('scheduled credential renewal silently preserves profile input and focus', async ({
   page,
 }) => {

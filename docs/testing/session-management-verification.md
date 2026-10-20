@@ -128,3 +128,48 @@ compatible caller-only API before the frontend, verify the provider contract sep
 prior artifacts, and use a compatible scoped-auth cleanup shell for rollback. Never restore the
 old frontend alone while leaving shared credentials behind. No deployment, production identity,
 provider configuration, infrastructure mutation, or application-data migration was performed.
+
+## PR #1 review follow-up — 2026-10-20
+
+Both owner review findings are addressed locally against PR head `697be3d`:
+
+- The production AuthClient passes its bound Storage explicitly to each CognitoUser constructed
+  for SRP sign-in, recovery, and confirmation. The SDK does not inherit a pool's storage. A real-SDK
+  regression keeps constructors, token caching, getCurrentUser/getSession, and sign-out intact,
+  replacing only authentication transport. It proves scoped publication and fresh-provider
+  restoration, no unscoped SDK credentials, unrelated-key preservation, and no publication or
+  escaped credentials when authentication completes after logout. Recovery/confirmation users
+  also retain the injected memory scope. This is SDK-boundary evidence, not live Cognito/SRP
+  network verification or a production-authentication claim.
+- Family Retry now passes the renewable generation-bound request context rather than a raw
+  token. Component regressions exercise the real family request helper with an expired token,
+  both immediate renewal success and a transient renewal failure followed by successful retry.
+  They prove renewal occurs before sending, no expired request is sent, the renewed bearer is
+  used, and recoverable failure never signs the account out. A browser regression advances wall
+  time past expiry without firing scheduled renewal, then retries the failed directory and checks
+  restoration without password entry. All five configured browser projects pass that case.
+
+The real-SDK storage regression failed against the previous implementation. Both corrected
+expired-token retry component cases also failed with the original raw-token call and pass with
+the request-context fix. No authorization check or assertion was weakened. The owner confirmed
+an explicit-dependency/real-adapter testing convention, now recorded in `AGENTS.md`.
+
+Fresh verification: 329 unit tests, 33 integration tests, and 220 end-to-end browser cases passed.
+Lint, typecheck, frontend build, all eight Lambda build-only artifacts, and formatting passed.
+The initial sandboxed aggregate run could not open integration HTTP listeners (EPERM); it was
+rerun outside that process sandbox. The sequential accessibility suite passed all 45 cases. The approved aggregate rerun completed
+format, lint, typecheck, 329 unit tests, 33 integration tests, and both builds, then failed only at
+repository-wide strict OpenSpec validation: the same seven baseline items listed earlier. Unlike
+the earlier implementation checkpoint, formatting warnings no longer reproduce at this PR head.
+
+These corrections restore the already-approved session contracts. The archived implementation
+checklist remains 19/19 complete; no new product behavior, dependency, infrastructure change,
+production operation, or deployment was introduced. Review fixes and verification are tracked
+here rather than reopening or altering the archived plan. GitHub threads have not been replied
+to or resolved.
+
+Review-follow-up status: both findings and the confirmed convention are implemented and verified;
+remaining implementation work: none; intentionally deferred: none. The seven existing strict-spec
+validation items remain the only aggregate blocker. Diff review contains only the two production
+fixes, focused regression coverage, the approved guideline, and this evidence update. The archived
+19/19 checklist and its approved behavior contracts are unchanged.

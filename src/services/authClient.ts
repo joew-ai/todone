@@ -327,7 +327,12 @@ export class AuthClient {
   }
 
   private async signInSrp(username: string, password: string): Promise<SignInResult> {
-    const user = new CognitoUser({ Username: username, Pool: this.authenticatedPool });
+    // CognitoUser does not inherit Storage from its pool; bind every SDK write.
+    const user = new CognitoUser({
+      Username: username,
+      Pool: this.authenticatedPool,
+      Storage: this.storage,
+    });
     const authDetails = new AuthenticationDetails({ Username: username, Password: password });
 
     return new Promise<SignInResult>((resolve) => {
@@ -344,11 +349,19 @@ export class AuthClient {
   }
 
   private user(username: string): CognitoUser {
-    return new CognitoUser({ Username: username, Pool: this.authenticatedPool });
+    return new CognitoUser({
+      Username: username,
+      Pool: this.authenticatedPool,
+      Storage: this.storage,
+    });
   }
 
   private registrationUser(username: string): CognitoUser {
-    return new CognitoUser({ Username: username, Pool: this.registrationPool });
+    return new CognitoUser({
+      Username: username,
+      Pool: this.registrationPool,
+      Storage: this.storage,
+    });
   }
 
   private async registerLocal(

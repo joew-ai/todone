@@ -576,6 +576,96 @@ describe('ProductionBootstrap', () => {
     expect(wrapper.get('h2').text()).toBe('Set up your profile');
   });
 
+  it.each([false, true])(
+    'renews Family Retry after expiry without sign-out (transient renewal failure: %s)',
+    async (transientFailure) => {
+      let now = Date.now();
+      const credentials = {
+        idToken: 'original-token',
+        accessToken: 'access',
+        expiresAt: new Date(now + 120_000),
+      };
+      const renew = vi.fn().mockImplementation(async () => ({
+        kind: 'usable',
+        credentials: {
+          ...credentials,
+          idToken: 'renewed-token',
+          expiresAt: new Date(now + 3600_000),
+        },
+      }));
+      if (transientFailure)
+        renew.mockResolvedValueOnce({ kind: 'error', failure: 'provider-unavailable' });
+      const providerSignOut = vi.fn();
+      const previousSession = session;
+      session = createSessionController({
+        account: previousSession.account,
+        provider: {
+          restore: async () => ({ kind: 'usable', credentials }),
+          renew,
+          signIn: vi.fn(),
+          signOut: providerSignOut,
+        },
+        clock: { now: () => now },
+        foreground: () => false,
+        readContext: async () => ({
+          kind: 'success',
+          context: {
+            kind: 'active',
+            membership: { ...membership, username: 'parent-one' },
+            profile: { memberId: 'member-one', displayName: 'River', color: 'PINE', version: 1 },
+          },
+        }),
+      });
+      previousSession.dispose();
+      const actualFamilyClient = await vi.importActual<
+        typeof import('../../services/familyClient')
+      >('../../services/familyClient');
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+        .mockImplementation(
+          async () => new Response(JSON.stringify({ members: [] }), { status: 200 }),
+        );
+      fetchFamilyMembers.mockImplementation((source) =>
+        actualFamilyClient.fetchFamilyMembers(source, fetchImpl),
+      );
+      router = createAppRouter(session, createMemoryHistory());
+      await router.push({ name: AppRouteName.family });
+      const wrapper = mountBootstrap();
+      await flushPromises();
+      expect(wrapper.text()).toContain('Try again');
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      now += 121_000;
+      const retry = () =>
+        wrapper
+          .findAll('button')
+          .find((button) => button.text() === 'Try again')!
+          .trigger('click');
+      await retry();
+      await flushPromises();
+      if (transientFailure) {
+        expect(renew).toHaveBeenCalledTimes(1);
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        expect(session.state.value.kind).toBe('ready');
+        expect(providerSignOut).not.toHaveBeenCalled();
+        expect(wrapper.text()).toContain('Try again');
+        await retry();
+        await flushPromises();
+      }
+      expect(renew).toHaveBeenCalledTimes(transientFailure ? 2 : 1);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(fetchImpl.mock.calls[1]![1]).toMatchObject({
+        headers: { authorization: 'Bearer renewed-token' },
+        cache: 'no-store',
+      });
+      expect(providerSignOut).not.toHaveBeenCalled();
+      expect(session.state.value.kind).toBe('ready');
+      expect(wrapper.get('h2').text()).toBe('Family management');
+      wrapper.unmount();
+      session.dispose();
+    },
+  );
+
   it('renders the family directory and lets a member edit only their own profile', async () => {
     restoreSession.mockResolvedValue({
       idToken: 'token',

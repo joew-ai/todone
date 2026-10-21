@@ -71,7 +71,7 @@ async function fixture() {
     },
     resendWelcome: vi.fn(),
     updatePendingParentEmail: vi.fn(),
-    markEmailVerified: vi.fn(),
+    stageRecoveryEmail: vi.fn(),
     deleteUser: vi.fn(),
   };
   const app = express();

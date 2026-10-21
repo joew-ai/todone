@@ -59,6 +59,7 @@ export interface SessionProvider {
   signIn(
     username: string,
     password: string,
+    newPassword?: string,
   ): Promise<(SignInResult & { browserGeneration?: string }) | { kind: 'cancelled' }>;
   signOut(
     reason?: 'explicit' | 'ended' | 'credentials-stale',
@@ -87,7 +88,8 @@ export interface SessionDependencies {
     | 'resendConfirmationCode'
     | 'forgotPassword'
     | 'confirmForgotPassword'
-  >;
+  > &
+    Partial<Pick<AuthClient, 'verifyEmailAttribute'>>;
 }
 
 /** One lifecycle owner per app. Credentials stay outside readonly presentation state. */
@@ -280,6 +282,7 @@ export function createSessionController(dependencies: SessionDependencies) {
   async function signIn(
     username: string,
     password: string,
+    newPassword?: string,
   ): Promise<AuthActionResult | { kind: 'cancelled' }> {
     if (disposed) return { kind: 'cancelled' };
     const captured = invalidate();
@@ -289,7 +292,7 @@ export function createSessionController(dependencies: SessionDependencies) {
     }
     clearPrivateState();
     try {
-      const result = await dependencies.provider.signIn(username, password);
+      const result = await dependencies.provider.signIn(username, password, newPassword);
       if (!isCurrent(captured)) return { kind: 'cancelled' };
       if (result.kind === 'cancelled') {
         await reconcileBrowserAccount();
@@ -631,7 +634,21 @@ export function createSessionController(dependencies: SessionDependencies) {
     state.value = { kind: 'ready', context, resolvedAt: state.value.resolvedAt };
   }
 
+  async function verifyEmailAttribute(
+    code?: string,
+  ): Promise<AuthActionResult | { kind: 'cancelled' }> {
+    const captured = generation;
+    await ensureUsableCredentials();
+    if (!isCurrent(captured) || !credentials || !dependencies.account?.verifyEmailAttribute)
+      return { kind: 'cancelled' };
+    const result = await dependencies.account.verifyEmailAttribute(credentials.accessToken, code);
+    if (!isCurrent(captured) || !browserIdentityMatches()) return { kind: 'cancelled' };
+    if (result.kind === 'success' && code !== undefined) await ensureUsableCredentials(true);
+    if (!isCurrent(captured) || !browserIdentityMatches()) return { kind: 'cancelled' };
+    return result;
+  }
   return {
+    verifyEmailAttribute,
     state: readonly(state),
     backgroundFailure: readonly(backgroundFailure),
     identityVersion: readonly(identityVersion),

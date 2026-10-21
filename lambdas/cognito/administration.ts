@@ -12,7 +12,7 @@ export const CognitoAdministrationOperation = {
   createUser: 'create-user',
   resendWelcome: 'resend-welcome',
   updatePendingParentEmail: 'update-pending-parent-email',
-  markEmailVerified: 'mark-email-verified',
+  stageRecoveryEmail: 'stage-recovery-email',
   setPermanentPassword: 'set-permanent-password',
   deleteUser: 'delete-user',
   globalSignOut: 'global-sign-out',
@@ -90,7 +90,7 @@ export interface CognitoAdministration {
   createUser(input: CreateCognitoUserInput): Promise<CreatedCognitoUser>;
   resendWelcome(username: string): Promise<void>;
   updatePendingParentEmail(username: string, email: string): Promise<void>;
-  markEmailVerified(username: string): Promise<void>;
+  stageRecoveryEmail(username: string, email: string): Promise<void>;
   setPermanentPassword(username: string, password: string): Promise<void>;
   deleteUser(username: string): Promise<void>;
   globalSignOut(username: string): Promise<void>;
@@ -162,11 +162,12 @@ export class AwsCognitoAdministration implements CognitoAdministration {
     );
   }
 
-  async markEmailVerified(username: string): Promise<void> {
+  /** Cognito retains the existing verified email until native attribute verification promotes its replacement. */
+  async stageRecoveryEmail(username: string, email: string): Promise<void> {
     await this.updateAttributes(
       username,
-      [{ Name: CognitoAttribute.emailVerified, Value: String(true) }],
-      CognitoAdministrationOperation.markEmailVerified,
+      [{ Name: CognitoAttribute.email, Value: email }],
+      CognitoAdministrationOperation.stageRecoveryEmail,
     );
   }
 

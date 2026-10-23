@@ -1,16 +1,19 @@
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminGetUserCommand,
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
   AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
+  UserStatusType,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { messages } from '../shared/messages';
 
 export const CognitoAdministrationOperation = {
   createUser: 'create-user',
   resendWelcome: 'resend-welcome',
+  canResendWelcome: 'can-resend-welcome',
   updatePendingParentEmail: 'update-pending-parent-email',
   stageRecoveryEmail: 'stage-recovery-email',
   setPermanentPassword: 'set-permanent-password',
@@ -88,6 +91,7 @@ export interface CreatedCognitoUser {
  */
 export interface CognitoAdministration {
   createUser(input: CreateCognitoUserInput): Promise<CreatedCognitoUser>;
+  canResendWelcome(sub: string): Promise<boolean>;
   resendWelcome(username: string): Promise<void>;
   updatePendingParentEmail(username: string, email: string): Promise<void>;
   stageRecoveryEmail(username: string, email: string): Promise<void>;
@@ -130,6 +134,21 @@ export class AwsCognitoAdministration implements CognitoAdministration {
       if (!sub)
         throw new CognitoAdministrationError(CognitoAdministrationFailure.unknown, operation);
       return { sub };
+    } catch (error) {
+      throw safeAdministrationError(error, operation);
+    }
+  }
+
+  /** Cognito invitation credentials apply only before the NEW_PASSWORD_REQUIRED transition. */
+  async canResendWelcome(sub: string): Promise<boolean> {
+    const operation = CognitoAdministrationOperation.canResendWelcome;
+    try {
+      const response = await this.client.send(
+        new AdminGetUserCommand({ UserPoolId: this.userPoolId, Username: sub }),
+      );
+      if (!response.UserStatus || response.Enabled === undefined)
+        throw new CognitoAdministrationError(CognitoAdministrationFailure.unknown, operation);
+      return response.Enabled && response.UserStatus === UserStatusType.FORCE_CHANGE_PASSWORD;
     } catch (error) {
       throw safeAdministrationError(error, operation);
     }

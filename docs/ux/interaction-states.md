@@ -111,3 +111,19 @@ family directory remains available. Missing child Profiles still fail closed. Af
 verification and activation, `/profile/setup` requires that parent to choose their own name/color
 through the existing self-only version-zero Profile API before family management. Cancellation
 handles absent and legacy-present Profiles without granting peers profile-write authority.
+
+## PR activation recovery correction
+
+Welcome resend and change-email-and-resend privately read provider invitation eligibility under
+the pending owner before mutation. Only enabled accounts awaiting password setup qualify.
+After password setup, return safe WELCOME_SETUP_UNAVAILABLE conflict feedback without changing
+email or retaining ownership; the invited parent finishes native verification themselves. A
+read-only failure releases ownership. Definitive pure-resend invalid-state/throttling releases
+ownership; unknown send outcomes and any email-update/resend split retain it for quiesced repair.
+The status read never authorizes activation and provider fields do not enter directory responses.
+
+Pending activation entry/restoration renews credentials and attempts the self endpoint without a
+code. EMAIL_VERIFICATION_REQUIRED alone returns to code entry. Successful native verification
+may consume a code before renewal/activation fails: explicit Retry activation renews and retries
+self activation without replaying the code. Conflict refreshes authorized state without tearing
+down the pending page or automatically looping mutations. Generation checks discard late results.

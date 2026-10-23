@@ -163,3 +163,19 @@ Provider references: [email-attribute verification](https://docs.aws.amazon.com/
 The local second-parent fixture now starts active with no Profile so the owner can test first-login
 self-profile setup without real email delivery. First-parent/child fixture Profiles remain configured;
 the seeded browser test completes the second parent's own setup before testing family permissions.
+
+### PR review: invitation eligibility and activation recovery
+
+Under exclusive pending ownership, read Cognito AdminGetUser by immutable sub and allow
+welcome/email-and-resend only for enabled FORCE_CHANGE_PASSWORD identities. Release the guard
+after read-only failure or ineligible state before any mutation. A password-setup race may still
+produce a definitive resend invalid-state rejection: release only for resend with no prior email
+mutation. Throttled pure resend also releases; unknown sends and email-update/resend splits remain
+locked for quiesced operator repair. Provider status stays private and never grants activation.
+
+On entry/restoration of a pending session, renew credentials and try self activation without a code.
+Only EMAIL_VERIFICATION_REQUIRED shows the verification form. After submitting a code, retry
+activation independently even if native verification consumed the code and renewal failed. A
+conflict refreshes authorized context; conflict/network failures show an explicit activation retry,
+with no automatic mutation loop. Every continuation checks captured session generation. No local
+verified flag or persisted draft authorizes activation; server binding validation remains final.

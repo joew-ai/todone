@@ -60,6 +60,9 @@ function administration(calls: string[], failure?: Error): CognitoAdministration
     async setPermanentPassword(username) {
       calls.push(`password:${username}`);
     },
+    async canResendWelcome() {
+      return true;
+    },
     async resendWelcome() {},
     async updatePendingParentEmail() {},
     async stageRecoveryEmail() {},

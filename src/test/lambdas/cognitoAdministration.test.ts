@@ -1,6 +1,7 @@
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminGetUserCommand,
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
   AdminUserGlobalSignOutCommand,
@@ -158,6 +159,9 @@ describe('Cognito administration adapter', () => {
         calls.push(input);
         return { sub: 'fixed-sub' };
       },
+      async canResendWelcome() {
+        return true;
+      },
       async resendWelcome() {},
       async updatePendingParentEmail() {},
       async stageRecoveryEmail() {},
@@ -192,4 +196,34 @@ it('stages a recovery email without changing email_verified in either direction'
   expect((client.commands[0] as AdminUpdateUserAttributesCommand).input.UserAttributes).toEqual([
     { Name: 'email', Value: 'replacement@example.test' },
   ]);
+});
+
+it.each([
+  ['FORCE_CHANGE_PASSWORD', true, true],
+  ['CONFIRMED', true, false],
+  ['FORCE_CHANGE_PASSWORD', false, false],
+  ['RESET_REQUIRED', true, false],
+] as const)(
+  'checks private invitation eligibility for %s enabled=%s',
+  async (UserStatus, Enabled, eligible) => {
+    const client = new FakeClient();
+    client.responses.push({
+      UserStatus,
+      Enabled,
+      UserAttributes: [{ Name: 'email', Value: 'private@example.test' }],
+    });
+    expect(await adapter(client).canResendWelcome('immutable-sub')).toBe(eligible);
+    expect(client.commands[0]).toBeInstanceOf(AdminGetUserCommand);
+    expect((client.commands[0] as AdminGetUserCommand).input).toEqual({
+      UserPoolId: 'pool-one',
+      Username: 'immutable-sub',
+    });
+  },
+);
+it('does not infer invitation eligibility from missing provider state', async () => {
+  const client = new FakeClient();
+  await expect(adapter(client).canResendWelcome('immutable-sub')).rejects.toMatchObject({
+    kind: 'unknown',
+    operation: 'can-resend-welcome',
+  });
 });

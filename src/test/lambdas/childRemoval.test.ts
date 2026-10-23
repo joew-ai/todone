@@ -58,6 +58,7 @@ async function fixture() {
     createUser: vi.fn(),
     setPermanentPassword: vi.fn(),
     globalSignOut: vi.fn(),
+    canResendWelcome: vi.fn().mockResolvedValue(true),
     resendWelcome: vi.fn(),
     updatePendingParentEmail: vi.fn(),
     stageRecoveryEmail: vi.fn(),

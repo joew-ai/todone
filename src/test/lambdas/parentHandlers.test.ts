@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import type { CognitoAdministration } from '../../../lambdas/cognito/administration';
+import {
+  CognitoAdministrationError,
+  type CognitoAdministration,
+} from '../../../lambdas/cognito/administration';
 import { InMemoryHouseholdRepository } from '../../../lambdas/households/repository';
 import {
   activateParentHandler,
@@ -46,6 +49,7 @@ async function fixture() {
   });
   const administration: CognitoAdministration = {
     createUser: vi.fn().mockResolvedValue({ sub: 'pending' }),
+    canResendWelcome: vi.fn().mockResolvedValue(true),
     resendWelcome: vi.fn().mockResolvedValue(undefined),
     updatePendingParentEmail: vi.fn().mockResolvedValue(undefined),
     stageRecoveryEmail: vi.fn().mockResolvedValue(undefined),
@@ -321,4 +325,111 @@ it('a failed final pending write retains ownership after confirmed external comp
   await expect(f.repository.pendingParents.acquire(current, 'other')).rejects.toMatchObject({
     kind: 'conflict',
   });
+});
+
+it.each(['POST', 'PUT'])(
+  'rejects %s invitation actions after password setup without changing email or locking activation',
+  async (method) => {
+    const f = await fixture();
+    await createParentHandler(event(parent, f.details), f);
+    vi.mocked(f.administration.canResendWelcome).mockResolvedValue(false);
+    const response = await pendingParentActionHandler(
+      event(
+        parent,
+        method === 'PUT' ? { email: 'replacement@example.test' } : undefined,
+        method,
+        'id-3',
+      ),
+      f,
+    );
+    expect(response.statusCode).toBe(409);
+    expect(f.administration.canResendWelcome).toHaveBeenCalledWith('pending');
+    expect(f.administration.updatePendingParentEmail).not.toHaveBeenCalled();
+    expect(f.administration.resendWelcome).not.toHaveBeenCalled();
+    expect(
+      (
+        await activateParentHandler(
+          event('pending', undefined, 'POST', undefined, {
+            email: f.details.email,
+            email_verified: true,
+          }),
+          f,
+        )
+      ).statusCode,
+    ).toBe(200);
+  },
+);
+
+it.each(['invalid-state', 'throttled'] as const)(
+  'releases a definitive pure resend %s rejection',
+  async (kind) => {
+    const f = await fixture();
+    await createParentHandler(event(parent, f.details), f);
+    vi.mocked(f.administration.resendWelcome).mockRejectedValue(
+      new CognitoAdministrationError(kind, 'resend-welcome'),
+    );
+    expect(
+      (await pendingParentActionHandler(event(parent, undefined, 'POST', 'id-3'), f)).statusCode,
+    ).toBe(kind === 'throttled' ? 429 : 409);
+    expect(
+      (
+        await activateParentHandler(
+          event('pending', undefined, 'POST', undefined, {
+            email: f.details.email,
+            email_verified: true,
+          }),
+          f,
+        )
+      ).statusCode,
+    ).toBe(200);
+  },
+);
+
+it('retains ownership when password setup races email update and resend rejects', async () => {
+  const f = await fixture();
+  await createParentHandler(event(parent, f.details), f);
+  vi.mocked(f.administration.resendWelcome).mockRejectedValue(
+    new CognitoAdministrationError('invalid-state', 'resend-welcome'),
+  );
+  expect(
+    (
+      await pendingParentActionHandler(
+        event(parent, { email: 'replacement@example.test' }, 'PUT', 'id-3'),
+        f,
+      )
+    ).statusCode,
+  ).toBe(500);
+  expect(f.administration.updatePendingParentEmail).toHaveBeenCalledTimes(1);
+  expect(
+    (
+      await activateParentHandler(
+        event('pending', undefined, 'POST', undefined, {
+          email: f.details.email,
+          email_verified: true,
+        }),
+        f,
+      )
+    ).statusCode,
+  ).toBe(409);
+});
+
+it('releases ownership on read-only provider failure', async () => {
+  const f = await fixture();
+  await createParentHandler(event(parent, f.details), f);
+  vi.mocked(f.administration.canResendWelcome).mockRejectedValue(new Error('read failed'));
+  expect(
+    (await pendingParentActionHandler(event(parent, undefined, 'POST', 'id-3'), f)).statusCode,
+  ).toBe(500);
+  expect(f.administration.resendWelcome).not.toHaveBeenCalled();
+  expect(
+    (
+      await activateParentHandler(
+        event('pending', undefined, 'POST', undefined, {
+          email: f.details.email,
+          email_verified: true,
+        }),
+        f,
+      )
+    ).statusCode,
+  ).toBe(200);
 });

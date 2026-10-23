@@ -57,3 +57,23 @@ describe('pending verification lifecycle', () => {
     f.controller.dispose();
   });
 });
+
+it('refreshes pending authority without rebuilding the page or changing identity generation', async () => {
+  const f = fixture(async () => ({ kind: 'success' }));
+  await f.controller.initialize();
+  const identityVersion = f.controller.identityVersion.value;
+  const states: string[] = [];
+  const { watch } = await import('vue');
+  const stop = watch(f.controller.state, (state) => states.push(state.kind), { flush: 'sync' });
+  const request = f.controller.requestContext(false);
+  await f.controller.refreshContext(true);
+  expect(states).toEqual(['recoverable-error']);
+  expect(f.controller.identityVersion.value).toBe(identityVersion);
+  expect(request.isCurrent?.()).toBe(true);
+  expect(f.controller.state.value).toMatchObject({
+    kind: 'recoverable-error',
+    failure: 'pending-activation',
+  });
+  stop();
+  f.controller.dispose();
+});

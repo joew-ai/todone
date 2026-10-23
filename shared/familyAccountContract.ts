@@ -12,6 +12,7 @@ export const ParentAccountApi = {
 } as const;
 export const ParentAccountError = {
   conflict: 'PENDING_ACCOUNT_CONFLICT',
+  welcomeUnavailable: 'WELCOME_SETUP_UNAVAILABLE',
   unproven: 'EMAIL_VERIFICATION_REQUIRED',
   unavailable: 'PENDING_ACCOUNT_UNAVAILABLE',
   localRecoveryUnsupported: 'LOCAL_RECOVERY_EMAIL_UNSUPPORTED',

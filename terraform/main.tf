@@ -16,6 +16,7 @@ locals {
   ]
   family_account_cognito_actions = [
     "cognito-idp:AdminCreateUser",
+    "cognito-idp:AdminGetUser",
     "cognito-idp:AdminDeleteUser",
     "cognito-idp:AdminSetUserPassword",
     "cognito-idp:AdminUpdateUserAttributes",

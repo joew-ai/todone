@@ -5,8 +5,9 @@
 `manage-family-accounts` now implements pending-parent creation, real SDK password challenge,
 native email-attribute verification and self activation, guarded resend/change/cancel, private
 parent recovery email, and confirmed child removal. Existing child creation/reset, profiles,
-directory, canonical routing and session boundaries remain part of this change. The working tree
-is uncommitted. No deployment, artifact publication, Terraform apply, or production smoke occurred.
+directory, canonical routing and session boundaries remain part of this change. The baseline feature
+was committed at `7e0a4a4`; subsequent PR activation corrections are recorded below. No deployment,
+artifact publication, Terraform apply, or production smoke occurred.
 
 Activation requires a server-verified ID token with verified email matching the current private
 salted binding. Password setup alone grants no household access. Both Membership copies change
@@ -113,19 +114,19 @@ inputs; no existing tfvars or historical plan is current evidence for these buil
 
 | ZIP | SHA-256 |
 | --- | --- |
-| `activate-parent.zip` | `a1722f8e99f0d035ff260858ebfc508565fb221cc708866f26c04217264fbf20` |
-| `create-child.zip` | `4d8eb3edfb3a91ef5ae67f71b64260c7f5c769eef7b22d0ff7a48def2536b593` |
-| `create-household.zip` | `4aa2fbee9504adc764120272d3a087416b940a4e44e733f18a680b04ab56acc3` |
-| `create-parent.zip` | `ca1a20bc81a95a53c6a6f73b9bd92bb8dac6263b6d2e66b84210d08aa4ba93fc` |
-| `current-membership.zip` | `e01ee7bfb96908dd8a97333ac1480061664633c9bf50081920c2bc2dd6894e56` |
-| `family-directory.zip` | `fd62b6563985285daf794b4a3e5b81f30ee7e375b5cfec73971084438c8ae486` |
-| `pending-parent-actions.zip` | `5b595ec79cc2e3ecc2c31b3db0ab240ffb14b4089ce25cf072babc61481533e4` |
-| `pre-signup.zip` | `8a6910184a5a46e7a2461af371e09d8d1b1762745ca4a943993200d3bca48bff` |
-| `profile.zip` | `bc024508d736e0b4ac9ef09864c25caea39ad2075983f928b87907ffa01a0db1` |
-| `recovery-email.zip` | `edc1d06a767cdf3ff3970d842486a0478c5a036417ff6b86a8ab64a85fd2e48b` |
-| `remove-child.zip` | `e7a4f45dd647850be3106cf0e3864a22ae02577ffb5807320beb49cef72598ed` |
-| `reset-child-password.zip` | `2ba75e261f88e6a2d62c8522f2ab106bea11e73369d8ae8fc1c13fff59621c11` |
-| `session.zip` | `b874bc8b2f50fe1b278d7251f6d9d53f2e9a9f324ce1883af59b679dd037f40a` |
+| `activate-parent.zip` | `5f2853de406a342c59f2e40d894ad318ec6eb1cde958d6a3836b71c65e58e7e1` |
+| `create-child.zip` | `1319d129d07f7d4b4edbc746c772284fd9d0f22560d66018ce1339fdf611481d` |
+| `create-household.zip` | `3369b76b039930efdd5c25dce810f0f51003886254f78ba58d9e62cdd6a2f5f4` |
+| `create-parent.zip` | `9b7d3c68a37556599859ed3a27ebe7955c55b581a152db1b7b77a89bd447c464` |
+| `current-membership.zip` | `5d88048ba93e8fe128d8d83f907b982ed7354b724921e5199b1c29287f55c902` |
+| `family-directory.zip` | `adf271c9ef23274bd0e7eb85a6a2cef6a5278db599084047d384a6d022a231d1` |
+| `pending-parent-actions.zip` | `762f409b33266c9f2d3bc174f1a6b5587cf372ee4bdcccbd6cfeb770528fff46` |
+| `pre-signup.zip` | `c1ab187db1498df46aabd4bf8d216b5c7d97da80f0b76d2e94f38febba2dca5d` |
+| `profile.zip` | `8fa0c29e7241be4e7599d66e72a4da86f53c8162053c56deaea3e0f1c9439180` |
+| `recovery-email.zip` | `f71edaf305d42ae5d192c2527992315780690eea29ace72d5803b1380d15c4a3` |
+| `remove-child.zip` | `f1b98679efd257f6b0bb5bf9c32e8911db2fefcc208bea7a006a3e5bc30f6fd9` |
+| `reset-child-password.zip` | `7848734b4db3905e426b503b62e6eaa5728dcc13507bb51af390c34eb9c0a51b` |
+| `session.zip` | `a77ec3343c889ff9baddbf8463e717d327a21087a491583c0a2969d5d0d93509` |
 
 ## Checklist reconciliation
 
@@ -220,3 +221,45 @@ Evidence: `/tmp/todone-review-verify.log`, `/tmp/todone-review-e2e.log`,
 The temporary development stack was stopped again for the owner's SSH bridge.
 Current checklist: 36/40 complete; 6.2 and 7.1–7.3 remain open for the existing AWS-plan/human
 acceptance gates. No unfinished task is intentionally deferred.
+
+## PR #2 activation recovery corrections
+
+Both new review findings at `7e0a4a4` are addressed. Pending welcome/email-and-resend now read
+private provider invitation eligibility under the owner before mutation. Confirmed accounts
+receive safe conflict feedback without a retained guard or email change. Definitive pure-resend
+invalid-state/throttling and read-only failures release ownership; unknown mutations and
+email-update/resend splits remain closed for quiesced repair. The existing privileged role adds
+pool-scoped `AdminGetUser`; ordinary read/profile/self-activation roles do not gain this permission.
+Provider references: [administrative creation](https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-create-user-accounts.html)
+and [AdminGetUser](https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_AdminGetUser.html).
+
+A pending session renews and attempts self activation independently on entry/restoration. Only
+server `EMAIL_VERIFICATION_REQUIRED` returns to native verification. After a consumed code and
+renewal/conflict/network failure, explicit Retry activation avoids code replay; conflict refreshes
+authority without rebuilding the pending page or automatically looping mutations. The server
+current-email binding and captured session generation remain authoritative.
+
+Verification for this correction:
+
+- `npm run verify-local`: passed, including 406 unit tests (50 files), 39 integration tests,
+  production frontend, all 13 Lambda builds, and 12 strict OpenSpec validations.
+- `npm run test:e2e`: 250 passed across the configured browser/viewport projects.
+- `npm run test:a11y`: 45 passed. Its pending-session fixture now supplies the entry proof check.
+- `npm run test:e2e:parent-activation`: 20 passed, including real SDK/synthetic HTTP conflict,
+  network and reload recovery, consumed-code no-replay assertions, and Axe on retry/profile states.
+- Compact and wide activation-retry screenshots were inspected. Automated checks do not replace
+  actual 200% zoom, screen-reader, owner UX, or live-provider release evidence.
+- Terraform recursive format and provider validation passed. No state-backed plan, apply,
+  deployment, production smoke, or live Cognito mutation was performed. The existing AWS-plan
+  and provider-only gates remain open.
+- Artifact canary scan covers browser/Lambda files and decompressed ZIP members. The hash table
+  above reflects the rebuilt unpublished ZIPs.
+
+Transient logs: `/tmp/todone-pr2-verify-current.log`, `/tmp/todone-pr2-e2e.log`,
+`/tmp/todone-pr2-a11y-final.log`, `/tmp/todone-pr2-activation-current.log`.
+Earlier failed/interrupted runs are superseded by these results. No real-emulator reset was
+needed for this correction; local unsupported-verification behavior remains explicitly denied.
+
+Checklist: 38/42 complete. Tasks 10.1 and 10.2 completed; 6.2, 7.1, 7.2 and 7.3 retain the
+previous AWS-plan/manual/provider evidence gates. None is intentionally deferred. This correction
+does not archive the change or claim release readiness.

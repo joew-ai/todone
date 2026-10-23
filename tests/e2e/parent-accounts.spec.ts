@@ -60,7 +60,7 @@ test('pending setup opens email verification and refuses unsupported emulator pr
   let activationCalls = 0;
   await context.route('**/api/v1/parent-activations', (route) => {
     activationCalls++;
-    return route.fulfill({ status: 500, json: { error: { code: 'INTERNAL_ERROR' } } });
+    return route.fulfill({ status: 403, json: { error: { code: 'EMAIL_VERIFICATION_REQUIRED' } } });
   });
   await page.goto('/sign-in');
   await page.getByLabel('Username', { exact: true }).fill('parentone');
@@ -74,7 +74,7 @@ test('pending setup opens email verification and refuses unsupported emulator pr
   await expect(page.getByRole('alert')).toContainText(
     'Local activation cannot verify email ownership',
   );
-  expect(activationCalls).toBe(0);
+  expect(activationCalls).toBe(1); // Entry proof check only; unsupported native verification never activates.
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.reload();
   await expect(page.getByLabel('Email-verification code', { exact: true })).toHaveValue('');

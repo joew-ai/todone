@@ -69,6 +69,7 @@ async function fixture() {
     async globalSignOut() {
       calls.push('signout');
     },
+    canResendWelcome: vi.fn().mockResolvedValue(true),
     resendWelcome: vi.fn(),
     updatePendingParentEmail: vi.fn(),
     stageRecoveryEmail: vi.fn(),

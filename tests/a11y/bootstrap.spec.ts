@@ -248,6 +248,12 @@ test('the parent family directory has no detectable WCAG A/AA violations', async
 
 for (const code of ['MEMBERSHIP_PENDING_ACTIVATION', 'MEMBERSHIP_INACTIVE']) {
   test(`session caller outcome ${code} has accessible recovery`, async ({ page }) => {
+    await page.route('**/api/v1/parent-activations', (route) =>
+      route.fulfill({
+        status: 403,
+        json: { error: { code: 'EMAIL_VERIFICATION_REQUIRED' } },
+      }),
+    );
     await page.goto('/sign-in');
     await signInAsChild(page, code);
     if (code === 'MEMBERSHIP_PENDING_ACTIVATION') {

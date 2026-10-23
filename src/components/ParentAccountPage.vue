@@ -10,6 +10,7 @@ import {
   watch,
 } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { ParentAccountError } from '../../shared/familyAccountContract';
 import { useSessionController } from '../session/injection';
 import { messages } from '../i18n/messages';
 import { AppRouteName } from '../router/routes';
@@ -35,6 +36,7 @@ const heading = ref<globalThis.HTMLElement | null>(null),
   isError = ref(false),
   fields = ref<Record<string, string>>({});
 const blockedUsername = ref('');
+const activationStep = ref<'checking' | 'verification' | 'activation'>('checking');
 let idempotencyKey = globalThis.crypto.randomUUID();
 let active = true;
 const creating = computed(() => route.name === AppRouteName.newParent);
@@ -58,6 +60,7 @@ function clear() {
   verificationCode.value = '';
   status.value = '';
   fields.value = {};
+  activationStep.value = 'checking';
 }
 watch(session.identityVersion, () => {
   clear();
@@ -81,6 +84,7 @@ onMounted(() => {
 });
 onActivated(() => {
   active = true;
+  if (pending.value && !busy.value && activationStep.value === 'checking') void resumeActivation();
   void nextTick(() => heading.value?.focus());
 });
 watch(
@@ -162,14 +166,46 @@ async function setup() {
     }
   });
 }
+// A restored pending session may already have consumed its verification code.
+watch(
+  [pending, busy],
+  () => {
+    if (active && pending.value && !busy.value && activationStep.value === 'checking')
+      void resumeActivation();
+  },
+  { immediate: true },
+);
+async function finishActivation(request: ReturnType<typeof session.requestContext>) {
+  activationStep.value = 'activation';
+  await session.ensureUsableCredentials(true);
+  if (!active || !request.isCurrent?.()) return;
+  const activated = await activateParent(request);
+  if (!active || !request.isCurrent?.()) return;
+  if (!outcome(activated)) {
+    if (activated.kind === 'error' && activated.code === ParentAccountError.unproven)
+      activationStep.value = 'verification';
+    else if (activated.kind === 'error' && activated.conflict) {
+      await session.refreshContext(true);
+      if (!active || !request.isCurrent?.()) return;
+    }
+    return;
+  }
+  await session.refreshContext(true);
+}
+async function resumeActivation() {
+  await run(() => finishActivation(session.requestContext(false)));
+}
 async function verify(sendOnly = false) {
   await run(async () => {
     const request = session.requestContext(false);
+    // Native verification may consume the code even if the subsequent renewal fails.
+    if (!sendOnly) activationStep.value = 'activation';
     const result = await session.verifyEmailAttribute(
       sendOnly ? undefined : verificationCode.value,
     );
     if (!active || !request.isCurrent?.() || result.kind === 'cancelled') return;
     if (result.kind === 'error') {
+      if (!sendOnly) activationStep.value = 'verification';
       status.value = result.message;
       isError.value = true;
       return;
@@ -178,10 +214,7 @@ async function verify(sendOnly = false) {
       status.value = copy.sentCode;
       return;
     }
-    const activated = await activateParent(request);
-    if (!active || !request.isCurrent?.()) return;
-    if (!outcome(activated)) return;
-    await session.refreshContext(true);
+    await finishActivation(request);
   });
 }
 </script>
@@ -242,8 +275,15 @@ async function verify(sendOnly = false) {
         }}</RouterLink>
       </div>
     </form>
-    <form v-else-if="pending" class="space-y-5" @submit.prevent="verify()">
-      <label class="block"
+    <form
+      v-else-if="pending"
+      class="space-y-5"
+      @submit.prevent="activationStep === 'verification' ? verify() : resumeActivation()"
+    >
+      <p v-if="activationStep !== 'verification'" class="body-secondary">
+        {{ copy.activationRetryHelp }}
+      </p>
+      <label v-if="activationStep === 'verification'" class="block"
         >{{ copy.verifyCode
         }}<input
           v-model="verificationCode"
@@ -253,8 +293,15 @@ async function verify(sendOnly = false) {
           :disabled="busy"
       /></label>
       <div class="form-actions">
-        <button type="submit" class="primary" :disabled="busy">{{ copy.verifyAction }}</button
-        ><button type="button" class="secondary" :disabled="busy" @click="verify(true)">
+        <button type="submit" class="primary" :disabled="busy">
+          {{ activationStep === 'verification' ? copy.verifyAction : copy.retryActivation }}</button
+        ><button
+          v-if="activationStep === 'verification'"
+          type="button"
+          class="secondary"
+          :disabled="busy"
+          @click="verify(true)"
+        >
           {{ copy.sendCode }}
         </button>
       </div>

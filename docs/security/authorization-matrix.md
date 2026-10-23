@@ -105,7 +105,7 @@ perform no side effects; uncertain external outcomes retain the guard for operat
 8. New endpoints are blocked from release until this matrix and its tests are updated.
 9. `POST /api/v1/parent-activations` is a narrow self-state transition, not a general household route: it accepts no target identity and may resolve only the verified caller's matching pending parent records.
 10. `credentialsValidAfter` is read from the user-membership lookup. Missing/old token `iat` after a cutoff returns reauthentication denial before household data or target reads.
-11. Cognito administration is dependency-injected only after the applicable caller and target rule succeeds. Its dedicated Lambda role permits only `AdminCreateUser`, `AdminDeleteUser`, `AdminSetUserPassword`, `AdminUpdateUserAttributes`, and `AdminUserGlobalSignOut` on the Todone user pool; ordinary read/profile Lambda roles have no Cognito administration permission.
+11. Cognito administration is dependency-injected only after the applicable caller and target rule succeeds. Its dedicated Lambda role permits only `AdminCreateUser`, `AdminGetUser` (private invitation eligibility), `AdminDeleteUser`, `AdminSetUserPassword`, `AdminUpdateUserAttributes`, and `AdminUserGlobalSignOut` on the Todone user pool; ordinary read/profile Lambda roles have no Cognito administration permission.
 
 ## Deleted-identity token boundary
 

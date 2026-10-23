@@ -45,6 +45,7 @@ async function fixture() {
   });
   const administration: CognitoAdministration = {
     createUser: vi.fn().mockResolvedValue({ sub: 'pending' }),
+    canResendWelcome: vi.fn().mockResolvedValue(true),
     resendWelcome: vi.fn(),
     updatePendingParentEmail: vi.fn(),
     stageRecoveryEmail: vi.fn(),

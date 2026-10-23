@@ -5,6 +5,7 @@ import type { CognitoAdministration } from '../cognito/administration';
 import {
   CognitoAdministrationError,
   CognitoAdministrationFailure,
+  CognitoAdministrationOperation,
 } from '../cognito/administration';
 import { getCognitoAdministration } from '../cognito/runtime';
 import { authenticateRequest } from '../shared/auth';
@@ -308,6 +309,25 @@ export async function pendingParentActionHandler(
         owner = randomUUID();
       await p.acquire(context, owner);
       const administration = dependencies.administration ?? getCognitoAdministration();
+      if (action !== 'cancel') {
+        let eligible: boolean;
+        try {
+          eligible = await administration.canResendWelcome(context.sub);
+        } catch (error) {
+          // This read cannot change Cognito; no mutation has begun under this owner.
+          await p.release(context, owner);
+          throw error;
+        }
+        if (!eligible) {
+          await p.release(context, owner);
+          return errorResponse(
+            HttpStatus.conflict,
+            ParentAccountError.welcomeUnavailable,
+            copy.welcomeUnavailable,
+            requestId,
+          );
+        }
+      }
       // Unknown or partial dependency failures deliberately leave the guard held for operator repair.
       try {
         // Immutable sub prevents a delayed SDK retry from deleting a reused username's new identity.
@@ -321,10 +341,19 @@ export async function pendingParentActionHandler(
         if (
           action === 'resend' &&
           error instanceof CognitoAdministrationError &&
-          error.kind === CognitoAdministrationFailure.throttled
+          error.operation === CognitoAdministrationOperation.resendWelcome &&
+          (error.kind === CognitoAdministrationFailure.throttled ||
+            error.kind === CognitoAdministrationFailure.invalidState)
         ) {
           await p.release(context, owner);
-          return errorResponse(429, ParentAccountError.conflict, copy.conflict, requestId);
+          if (error.kind === CognitoAdministrationFailure.throttled)
+            return errorResponse(429, ParentAccountError.conflict, copy.conflict, requestId);
+          return errorResponse(
+            HttpStatus.conflict,
+            ParentAccountError.welcomeUnavailable,
+            copy.welcomeUnavailable,
+            requestId,
+          );
         }
         throw error;
       }

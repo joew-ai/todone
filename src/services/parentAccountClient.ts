@@ -12,6 +12,7 @@ export type ParentAccountResult =
   | { kind: 'success'; member?: FamilyMember }
   | {
       kind: 'error';
+      code?: string;
       message: string;
       recoverable: boolean;
       conflict: boolean;
@@ -27,7 +28,11 @@ async function send(
   try {
     const { response, body } = await fetchAuthenticatedJson<{
       member?: FamilyMember;
-      error?: { message?: string; fieldErrors?: Array<{ field: string; message: string }> };
+      error?: {
+        code?: string;
+        message?: string;
+        fieldErrors?: Array<{ field: string; message: string }>;
+      };
     }>(url, credentials, {
       method,
       headers: {
@@ -39,6 +44,7 @@ async function send(
     if (response.ok) return { kind: 'success', ...(body?.member ? { member: body.member } : {}) };
     return {
       kind: 'error',
+      code: body?.error?.code,
       message: body?.error?.message ?? messages.parentAccounts.uncertain,
       recoverable: response.status < 500 && response.status !== 401,
       conflict: response.status === 409 || response.status === 403,

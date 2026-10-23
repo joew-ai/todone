@@ -366,3 +366,31 @@ An inviter SHALL supply only username and recovery email when creating an additi
 #### Scenario: Child account actions on desktop
 - **WHEN** an active child row is shown on a desktop layout
 - **THEN** the Reset child password navigation link and Remove child account action are grouped with aligned vertical centers and consistent target height, while remaining usable when compact layouts wrap
+
+### Requirement: Pending parent activation recovers without replaying consumed codes
+
+The system SHALL distinguish invitation eligibility before password setup from pending email
+verification after password setup. Welcome/email-and-resend SHALL check private provider state
+under the pending guard before mutation and reject ineligible accounts without retaining ownership.
+Pure resend SHALL release ownership on a definitive side-effect-free invalid-state rejection;
+unknown outcomes and email-update/resend splits SHALL retain ownership.
+
+#### Scenario: Parent already chose a password
+
+- **WHEN** a peer requests resend or change-email-and-resend for a confirmed pending parent
+- **THEN** no email or invitation is mutated, ownership is released, and self verification/activation remains possible
+
+#### Scenario: Password setup races invitation resend
+
+- **WHEN** the provider definitively rejects pure resend after eligibility was checked
+- **THEN** ownership is released, but an email-update/resend split remains closed for operator repair
+
+#### Scenario: Verification consumed a code before activation failed
+
+- **WHEN** native verification succeeds but renewal or activation fails
+- **THEN** explicit retry renews credentials and retries self activation without submitting the code again, and conflict refreshes authorized context
+
+#### Scenario: Verified pending identity is restored
+
+- **WHEN** a verified pending identity reloads or signs in again
+- **THEN** renewed-token self activation is attempted independently and only the server current-binding rejection returns the UI to verification

@@ -52,3 +52,13 @@ and color on first login after verification/activation using existing required s
 Pending and active-unconfigured parent directory entries omit profile fields and use username;
 child provisioning still includes parent-chosen profile data. Desktop child actions share one aligned
 action group. This supersedes invitation requirements that previously collected peer profile data.
+
+## PR review: recoverable activation
+
+Welcome resend and change-email-and-resend apply only before password setup. Check provider
+invitation eligibility under the existing guard before mutation; confirmed accounts instead
+complete native verification themselves. Add only pool-scoped `AdminGetUser` to the existing
+privileged role; ordinary read/profile/activation roles receive no provider status permission. A definitive side-effect-free resend rejection releases
+ownership. Unknown mutation outcomes and email-update/resend splits retain ownership.
+Self activation is independently resumable after consumed-code verification, token-renewal or
+activation failure, and reload/sign-in; only the server current-binding check requires verification.

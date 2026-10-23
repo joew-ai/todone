@@ -75,6 +75,9 @@ interface EnglishMessages {
     verifyCode: string;
     verifyHelp: string;
     verifyAction: string;
+    retryActivation: string;
+    activationRetryHelp: string;
+    welcomeUnavailable: string;
     sendCode: string;
     sentCode: string;
     activationSuccess: string;

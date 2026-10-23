@@ -488,10 +488,16 @@ export function createSessionController(dependencies: SessionDependencies) {
   function refreshContext(force = false): Promise<void> {
     if (disposed) return Promise.resolve();
     if (pendingContextRefresh) return pendingContextRefresh;
-    if (state.value.kind !== 'ready') return initialize();
-    if (!force && clock.now() - state.value.resolvedAt < SESSION_CONTEXT_FRESHNESS_MS)
+    const wasPending =
+      state.value.kind === 'recoverable-error' && state.value.failure === 'pending-activation';
+    if (state.value.kind !== 'ready' && !wasPending) return initialize();
+    if (
+      state.value.kind === 'ready' &&
+      !force &&
+      clock.now() - state.value.resolvedAt < SESSION_CONTEXT_FRESHNESS_MS
+    )
       return Promise.resolve();
-    const previous = state.value.context;
+    const previous = state.value.kind === 'ready' ? state.value.context : undefined;
     const captured = generation;
     const startedAt = clock.now();
     const capturedContextVersion = contextVersion;
@@ -515,8 +521,10 @@ export function createSessionController(dependencies: SessionDependencies) {
             result.failure === 'inactive' ||
             result.failure === 'inconsistent'
           ) {
-            identityVersion.value += 1;
-            clearPrivateState();
+            if (!wasPending || result.failure !== 'pending-activation') {
+              identityVersion.value += 1;
+              clearPrivateState();
+            }
             state.value = { kind: 'recoverable-error', failure: result.failure };
             return;
           }
@@ -524,11 +532,12 @@ export function createSessionController(dependencies: SessionDependencies) {
           return;
         }
         const next = result.context;
-        if (previous.kind !== 'unattached' && next.kind === 'unattached') {
+        if (previous && previous.kind !== 'unattached' && next.kind === 'unattached') {
           endSession('ended');
           return;
         }
         if (
+          previous &&
           previous.kind !== 'unattached' &&
           next.kind !== 'unattached' &&
           (previous.membership.memberId !== next.membership.memberId ||

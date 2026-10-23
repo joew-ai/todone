@@ -83,3 +83,8 @@ review guide now supplies six ordered local journeys with expected outcomes and 
 
 - [x] 9.1 Move additional-parent display name/color from invitation to required first-login self-profile setup; completion: username/email-only UI and API, no invitation Profile write, profile-less parent directory/replays/cancellation work, native activation routes to persistent self-only profile setup, local seed remains usable, canonical docs/reference are updated, and unit/integration/browser/accessibility checks cover the revised flow.
 - [x] 9.2 Align child password-reset and removal controls vertically in one responsive action group; completion: desktop bounding-box and visual checks confirm equal target height/aligned centers, keyboard/navigation semantics are preserved, and compact reflow/accessibility checks pass.
+
+## 10. PR activation recovery corrections
+
+- [x] 10.1 Guard invitation mutations with private provider eligibility; release side-effect-free resend rejection and preserve uncertain/split ownership; add provider-adapter and handler regression tests.
+- [x] 10.2 Resume renewed-token self activation after consumed-code failure and restoration; refresh context on conflict, require verification only for server unproven binding, and add component/SDK browser regression coverage.

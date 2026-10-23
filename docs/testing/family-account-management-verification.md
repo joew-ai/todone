@@ -108,3 +108,15 @@ setup-code expiry/reuse, wrong/expired native email codes, changed intended addr
 old provider email, renewed verified ID claims, staged recovery-email promotion, and the configured
 built-in sender quota (50 messages/day). Record evidence privately without codes/contact data.
 Do not run these provider checks against production without separate authorization.
+
+## PR recovery regression coverage
+
+Handler tests cover post-password-setup resend and email-change denial without mutation,
+definitive pure-resend rejection, read-only failure, uncertain resend, and email-update/resend
+split ownership. Adapter tests use actual AdminGetUser commands and fail closed on absent state.
+Component tests exercise a real session controller for consumed-code conflicts, network failures,
+renewal failure, restored pending sessions, current-binding rejection, and late sign-out results.
+The native SDK browser suite covers successful activation plus conflict/network/reload recovery
+without resubmitting a consumed code, across all configured browser/viewport projects with Axe.
+Actual provider invitation eligibility, the password-setup race, and native delivery remain
+provider release checks; synthetic HTTP responses do not demonstrate live AWS parity.

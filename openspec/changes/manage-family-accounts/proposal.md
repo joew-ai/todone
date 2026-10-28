@@ -62,3 +62,12 @@ privileged role; ordinary read/profile/activation roles receive no provider stat
 ownership. Unknown mutation outcomes and email-update/resend splits retain ownership.
 Self activation is independently resumable after consumed-code verification, token-renewal or
 activation failure, and reload/sign-in; only the server current-binding check requires verification.
+
+## Approved development and release boundary
+
+The owner approved credential-free development and manual acceptance on 2026-10-28.
+Implementation completion requires tested application artifacts, local verification and the
+`family-paas` contract/handoff. AWS credentials and authenticated state remain on the human
+operator's computer. Full state-backed plan review, no-replacement TTL evidence, publication,
+apply and live Cognito checks remain mandatory human release gates, separate from development
+completion. No preservation, authorization or provider-verification requirement is waived.

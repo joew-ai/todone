@@ -34,7 +34,7 @@ npx playwright test <spec-file> --project=webkit
 
 `test:e2e` runs the configured critical Playwright suite in Chromium, Firefox, and WebKit. `test:a11y` runs automated accessibility checks at representative compact, medium, and wide viewports. CI uses a clean install and the same script names; hidden alternate pass paths are not allowed.
 
-Infrastructure validation executes in the separate `family-paas` repository. That owner MUST report its exact format, validation, policy-test, and Terraform-plan commands in the handoff evidence; Todone does not invent or prescribe that repository's internal command paths. No verification command may apply, deploy, invalidate production, create production users, restore, or smoke-test production without explicit human authorization.
+Application build/test commands require no Terraform installation, authenticated state or AWS credentials. Authenticated infrastructure validation executes on the human operator's computer using the separate `family-paas` repository. That owner MUST report its exact format, validation, policy-test, and Terraform-plan commands in the handoff evidence; Todone does not invent or prescribe that repository's internal command paths. No verification command may apply, deploy, invalidate production, create production users, restore, or smoke-test production without explicit human authorization.
 
 ## Offline development
 

@@ -1,5 +1,10 @@
 # Next-agent handoff: family account management
 
+Current status (2026-10-28): implementation complete, 42/42 tasks, after owner-approved manual
+acceptance and separation of credential-free development from human release verification.
+No authenticated plan, apply, publication or live-provider smoke is claimed. Earlier progress
+entries below are chronological evidence; the final closeout section is authoritative.
+
 ## Implemented scope
 
 `manage-family-accounts` now implements pending-parent creation, real SDK password challenge,
@@ -263,3 +268,29 @@ needed for this correction; local unsupported-verification behavior remains expl
 Checklist: 38/42 complete. Tasks 10.1 and 10.2 completed; 6.2, 7.1, 7.2 and 7.3 retain the
 previous AWS-plan/manual/provider evidence gates. None is intentionally deferred. This correction
 does not archive the change or claim release readiness.
+
+## Approved implementation closeout (2026-10-28)
+
+The owner approved the development/release split after confirming manual acceptance, including
+actual 200% browser zoom and screen-reader checks. Browser/reader metadata was not supplied;
+record this as owner-reported acceptance. Proposal,
+design, requirements and tasks now agree: development completes with implemented/tested
+behavior, credential-free quality/artifact evidence and the platform handoff. The actual
+state-backed plan, existing-table/no-replacement `expiresAt` TTL review, IAM/artifact review,
+publication/apply and live-provider checks remain mandatory human release gates. They are
+assigned to the operator's computer, not waived or represented as passed.
+
+Implementation tasks 6.2 and 7.3 now complete under those approved criteria. Final progress is
+42/42; no implementation tasks remain blocked or intentionally deferred. The agent workspace
+needs no AWS credentials. `family-account-plan-review.md` records build commands, runtime and
+public configuration contracts, existing helper limitations and the human release workflow.
+The change is complete for implementation and remains unarchived. No application/runtime code,
+Terraform resources or build scripts changed in this closeout.
+
+Verification: `npm run verify-local` passed with 406 unit tests, 39 integration tests, frontend
+and 13 Lambda builds, and 12 strict OpenSpec validations. Both real-emulator smokes passed
+(one seed test plus three authentication/account-management tests). Existing full browser
+coverage (250), accessibility (45) and native-SDK activation coverage (20) remain applicable to
+the unchanged implementation. Terraform recursive format/provider validation passed on the
+unchanged infrastructure source; no real plan is claimed. The temporary stack was stopped.
+No deployment, apply, artifact publication, or live-provider smoke occurred.

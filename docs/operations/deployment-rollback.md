@@ -6,6 +6,15 @@ Todone has one production environment and no staging environment. Local simulati
 
 An agent or CI job MUST NOT apply Terraform, upload or publish production artifacts, change Cognito, update Lambda, invalidate CloudFront, create a production verification account, modify production data, or run a live authenticated smoke test without explicit human authorization for that action. A request to prepare or review a release is not deployment authorization.
 
+## Development completion and credential ownership
+
+Application development, local verification and build-only artifact production require no AWS
+credentials or Terraform state. AWS credentials, authenticated state and sensitive release inputs
+remain on the human operator's computer. A completed application checklist means the reviewed
+implementation and platform handoff are complete; it does not mean infrastructure was planned,
+artifacts published, or live-provider behavior verified. The plan, table-preservation, IAM and
+provider gates below remain mandatory before release. See `family-account-plan-review.md`.
+
 ## Roles
 
 | Role | Responsibility |

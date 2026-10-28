@@ -394,3 +394,21 @@ unknown outcomes and email-update/resend splits SHALL retain ownership.
 
 - **WHEN** a verified pending identity reloads or signs in again
 - **THEN** renewed-token self activation is attempted independently and only the server current-binding rejection returns the UI to verification
+
+### Requirement: Credential-free development and human-owned release verification
+
+Application implementation and local quality verification SHALL require neither AWS credentials
+nor authenticated Terraform state. Development completion SHALL include tested artifacts,
+manual owner acceptance and a documented platform handoff. Account-specific infrastructure
+evidence SHALL remain mandatory before release and SHALL be owned by the human operator.
+
+#### Scenario: Agent completes application development
+
+- **WHEN** local checks, artifact review, account-management tests, owner acceptance and the platform handoff are complete
+- **THEN** implementation can be completed without connecting to an AWS account or claiming a real Terraform plan has passed
+
+#### Scenario: Operator prepares a release locally
+
+- **WHEN** the human operator prepares publication and apply using `family-paas` and credentials on their own computer
+- **THEN** a full state-backed plan must prove existing-table preservation with `expiresAt` TTL, least-privilege IAM and reviewed artifact bindings, and table replacement blocks release
+- **AND** live Cognito/email verification and production smoke remain separately authorized release checks; local emulators, mock plans and source validation do not prove they passed

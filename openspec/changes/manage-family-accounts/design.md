@@ -179,3 +179,19 @@ activation independently even if native verification consumed the code and renew
 conflict refreshes authorized context; conflict/network failures show an explicit activation retry,
 with no automatic mutation loop. Every continuation checks captured session generation. No local
 verified flag or persisted draft authorizes activation; server binding validation remains final.
+
+### Approved credential-free development boundary
+
+Application build/test commands run without Terraform or AWS access. Backend artifacts use
+injected pool/table/client bindings at deployment; frontend builds accept public Cognito IDs
+and region without credentials. The existing frontend configuration is build-time configuration;
+build-once runtime configuration and publication-helper migration are outside this change.
+
+Development acceptance combines passing local quality checks, artifact review, removal and
+authorization tests, manual owner acceptance, and the platform handoff. The human operator
+uses `family-paas` on their own computer for authenticated plan/apply and live-provider checks.
+The real plan must preserve the existing table/resource identity with `expiresAt` TTL and no
+replacement, and review IAM, artifact bindings and rollback compatibility before release. Mock
+or source-only validation never substitutes for that release evidence. Agents do not request
+credentials, raw state, sensitive variable files or raw plans. The owner approved this separation
+on 2026-10-28; it changes development completion criteria, not runtime security or release gates.

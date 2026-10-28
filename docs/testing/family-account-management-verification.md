@@ -89,7 +89,7 @@ of reports. A concise “1–6 pass, except …” is enough; mark any untested 
 | Active child | Sign in, open `/todos`, attempt `/family/parents/new` and `/security` | Honest work-in-progress Todo page; no parent controls or peer mutation; server denies child authority independently of router. Automated browser/HTTP coverage. |
 | Any signed-in member | Edit own profile; navigate Back/Forward, reload, sign out from another tab | Safe profile drafts survive allowed navigation; sensitive forms clear on navigation/account loss. No private values enter URL/history. Automated multi-browser/session tests. |
 
-## Human-only review still required
+## Manual acceptance and provider release checks
 
 At compact (390px), medium (820px), and wide (1440px), review the canonical palette, long names,
 current-route navigation, pending actions, focused forms, and destructive dialog against
@@ -100,8 +100,10 @@ reflow/reduced-motion coverage are separate from manual accessibility approval.
 Use the browser's actual 200% zoom, keyboard only (Tab/Shift+Tab/Enter/Escape), and a screen reader
 on the same journeys. Expected: no lost controls or overlapping text, visible focus, dialog focus
 contained and restored, errors announced, no identity/status communicated only by color. Actual
-browser zoom and screen-reader review have not been performed by the implementation agent.
-Enlarged CSS text or a smaller viewport is not evidence of actual browser zoom.
+browser zoom and screen-reader checks were confirmed complete by the product owner on
+2026-10-28. This is owner-reported acceptance, not an implementation-agent screen-reader run.
+The owner did not supply browser/reader metadata; none is inferred. Enlarged CSS text or a
+smaller viewport alone is not evidence of actual browser zoom.
 
 A separately authorized AWS release owner must prove actual invitation initial/resend delivery,
 setup-code expiry/reuse, wrong/expired native email codes, changed intended address versus retained
@@ -120,3 +122,18 @@ The native SDK browser suite covers successful activation plus conflict/network/
 without resubmitting a consumed code, across all configured browser/viewport projects with Axe.
 Actual provider invitation eligibility, the password-setup race, and native delivery remain
 provider release checks; synthetic HTTP responses do not demonstrate live AWS parity.
+
+## Final closure status
+
+On 2026-10-28 the owner confirmed completion of the documented manual review, including actual
+200% browser zoom and screen-reader checks. Together with the existing automated coverage and
+reviewed screenshots, this closes tasks 7.1 and 7.2. The owner also approved the development/release split described below.
+
+The approved development criteria for 6.2 and 7.3 require implemented/tested removal, local
+quality and artifact evidence, and the platform handoff. They do not require agent access to
+AWS. Implementation is complete at 42/42 tasks. A full, current state-backed plan must still
+prove existing-table preservation with `expiresAt` TTL before release. Source review and provider
+validation do not supply that release evidence. See
+[family-account-plan-review.md](../operations/family-account-plan-review.md) for the operator-owned
+workflow. Live provider delivery/verification remains a separately authorized release check;
+manual UI acceptance is not evidence of a live Cognito mutation.

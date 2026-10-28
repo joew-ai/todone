@@ -1,6 +1,6 @@
 # Next-agent handoff: family account management
 
-Current status (2026-10-28): implementation complete, 42/42 tasks, after owner-approved manual
+Current status (2026-10-28): archived, implementation complete, 42/42 tasks, after owner-approved manual
 acceptance and separation of credential-free development from human release verification.
 No authenticated plan, apply, publication or live-provider smoke is claimed. Earlier progress
 entries below are chronological evidence; the final closeout section is authoritative.
@@ -284,7 +284,7 @@ Implementation tasks 6.2 and 7.3 now complete under those approved criteria. Fin
 42/42; no implementation tasks remain blocked or intentionally deferred. The agent workspace
 needs no AWS credentials. `family-account-plan-review.md` records build commands, runtime and
 public configuration contracts, existing helper limitations and the human release workflow.
-The change is complete for implementation and remains unarchived. No application/runtime code,
+The change is complete for implementation and is archived. No application/runtime code,
 Terraform resources or build scripts changed in this closeout.
 
 Verification: `npm run verify-local` passed with 406 unit tests, 39 integration tests, frontend
@@ -294,3 +294,13 @@ coverage (250), accessibility (45) and native-SDK activation coverage (20) remai
 the unchanged implementation. Terraform recursive format/provider validation passed on the
 unchanged infrastructure source; no real plan is claimed. The temporary stack was stopped.
 No deployment, apply, artifact publication, or live-provider smoke occurred.
+
+## Spec sync and archive (2026-10-28)
+
+The owner selected sync-before-archive. Main spec
+`openspec/specs/family-account-management/spec.md` now contains all 18 requirements and 75
+scenarios, preserved verbatim from the delta. A descriptive Purpose section was added and
+copied into the main spec; no normative behavior changed. The complete change, including its
+`.openspec.yaml`, moved to `openspec/changes/archive/2026-10-28-manage-family-accounts/`.
+All artifacts and all 42 implementation tasks were complete. Human release gates remain as
+documented above; archiving supplies no AWS plan, deployment or live-provider evidence.

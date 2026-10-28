@@ -1,3 +1,7 @@
+## Purpose
+
+Defines parent-managed family account provisioning, activation, recovery, profile identity, and removal while preserving household isolation and private credentials.
+
 ## ADDED Requirements
 
 ### Requirement: Explicit Membership Resolution
